@@ -56,7 +56,22 @@
             <h2>Meus serviços</h2>
             <a href="{{ url_for('new_service') }}">Novo serviço</a>
         </div>
-tem q terminar isso ai
+        <div class="card-grid">
+            {% for s in services %}
+                <article class="card">
+                    <h3>{{ s.title }}</h3>
+                    <p class="card-description">{{ s.description|truncate(140) }}</p>
+                    {% if s.price %}
+                        <p class="price">R$ {{ s.price }}</p>
+                    {% endif %}
+                </article>
+            {% else %}
+                <p>Você ainda não cadastrou serviços.</p>
+            {% endfor %}
+        </div>
+    </section>
+{% endif %}
+
 
 
 {% if g.user.role == 'produtor' %}
