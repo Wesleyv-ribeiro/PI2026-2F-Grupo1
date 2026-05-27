@@ -67,6 +67,8 @@ class PostgresCompatConnection:
         self._conn.close()
 
 
+
+
 def connect_db():
     try:
         raw_conn = psycopg2.connect(DEFAULT_DATABASE_URL)
@@ -959,9 +961,10 @@ def seed_admin():
     Senha: admin123  (recomendado trocar em produção)
     """
     conn = connect_db()
+    # Sempre garanta que exista uma conta admin e atualize a senha para o valor desejado.
     existing = conn.execute("SELECT id FROM users WHERE is_admin = 1 LIMIT 1").fetchone()
+    password_hash = generate_password_hash("Morango")
     if existing is None:
-        password_hash = generate_password_hash("admin123")
         conn.execute(
             """
             INSERT INTO users (
@@ -991,7 +994,13 @@ def seed_admin():
                 1,
             ),
         )
-        conn.commit()
+    else:
+        uid = existing["id"] if isinstance(existing, dict) or hasattr(existing, 'keys') else existing[0]
+        conn.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (password_hash, uid),
+        )
+    conn.commit()
     conn.close()
 
 
