@@ -700,6 +700,86 @@ def create_app():
             product=product,
         )
 
+    @app.route("/api/messages/<int:user_id>")
+    def api_messages(user_id):
+        """Polling endpoint – returns JSON list of messages for real-time chat."""
+        from flask import jsonify
+        if g.user is None:
+            return jsonify({"error": "not_logged_in"}), 401
+
+        since_id = request.args.get("since", 0, type=int)
+        db = get_db()
+
+        rows = db.execute(
+            """
+            SELECT
+                m.id,
+                m.content,
+                m.created_at,
+                m.sender_id,
+                su.name AS sender_name
+            FROM messages m
+            JOIN users su ON m.sender_id = su.id
+            WHERE ((m.sender_id = ? AND m.receiver_id = ?)
+               OR  (m.sender_id = ? AND m.receiver_id = ?))
+              AND m.id > ?
+            ORDER BY m.created_at ASC
+            """,
+            (g.user["id"], user_id, user_id, g.user["id"], since_id),
+        ).fetchall()
+
+        # mark incoming as read
+        db.execute(
+            "UPDATE messages SET is_read = 1 WHERE receiver_id = ? AND sender_id = ? AND is_read = 0",
+            (g.user["id"], user_id),
+        )
+        db.commit()
+
+        return jsonify([
+            {
+                "id": r["id"],
+                "content": r["content"],
+                "created_at": str(r["created_at"]),
+                "sender_id": r["sender_id"],
+                "sender_name": r["sender_name"],
+                "is_mine": r["sender_id"] == g.user["id"],
+            }
+            for r in rows
+        ])
+
+    @app.route("/api/send/<int:user_id>", methods=["POST"])
+    def api_send(user_id):
+        """AJAX send endpoint for real-time chat."""
+        from flask import jsonify
+        if g.user is None:
+            return jsonify({"error": "not_logged_in"}), 401
+
+        data = request.get_json(silent=True) or {}
+        content = (data.get("content") or "").strip()
+        if not content:
+            return jsonify({"error": "empty"}), 400
+
+        db = get_db()
+        db.execute(
+            "INSERT INTO messages (sender_id, receiver_id, content, created_at, is_read) VALUES (?, ?, ?, ?, 0)",
+            (g.user["id"], user_id, content, datetime.utcnow()),
+        )
+        db.commit()
+
+        last = db.execute(
+            "SELECT id, created_at FROM messages WHERE sender_id = ? AND receiver_id = ? ORDER BY id DESC LIMIT 1",
+            (g.user["id"], user_id),
+        ).fetchone()
+
+        return jsonify({
+            "id": last["id"],
+            "content": content,
+            "created_at": str(last["created_at"]),
+            "sender_id": g.user["id"],
+            "sender_name": g.user["name"],
+            "is_mine": True,
+        })
+
     @app.route("/admin")
     def admin_dashboard():
         if g.user is None or not g.user["is_admin"]:
@@ -1000,4 +1080,3 @@ if __name__ == "__main__":
     seed_admin()
     app = create_app()
     app.run(debug=True)
-

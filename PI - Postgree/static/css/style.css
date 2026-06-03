@@ -735,3 +735,76 @@ button:focus-visible, a:focus-visible {
         width: 100%;
     }
 }
+
+/* ── Chat-specific additions (global) ──────────────────────── */
+
+/* card / section used across pages */
+.card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    border: 1px solid #e8edf2;
+}
+
+.page-title {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 800;
+    color: var(--secondary);
+    margin: 1.25rem 0;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Flash messages */
+.flash-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.flash {
+    padding: 0.85rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.flash-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.flash-error   { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.flash-info    { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+
+/* btn-outline used in chat sidebar */
+.btn-outline {
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text);
+}
+
+.btn-outline:hover {
+    background: var(--surface-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn-full { width: 100%; }
+
+/* user-pill in header */
+.user-pill {
+    font-size: 0.85rem;
+    color: var(--muted);
+    padding: 0.35rem 0.75rem;
+    background: var(--surface-strong);
+    border-radius: 999px;
+}
