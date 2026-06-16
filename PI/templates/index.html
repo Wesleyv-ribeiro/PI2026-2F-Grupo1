@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}CONCOOP - Conectando o campo{% endblock %}
+
+{% block content %}
+
+<section class="hero hero-slim">
+    <div class="hero-text">
+        <h1>Rede do produtor rural</h1>
+        <p>
+            Conecte-se com produtores, veterinários e compradores em um só lugar.
+        </p>
+        {% if not g.user %}
+            <div class="hero-actions">
+                <a href="{{ url_for('register') }}" class="btn btn-primary">Criar minha conta</a>
+                <a href="{{ url_for('login') }}" class="btn btn-secondary">Já tenho conta</a>
+            </div>
+        {% else %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Ir para meu painel</a>
+        {% endif %}
+    </div>
+</section>
+
+<div class="home-layout">
+    <aside class="home-column home-left">
+        {% if g.user %}
+            <div class="card">
+                <h2>Meu resumo</h2>
+                <p><strong>{{ g.user.name }}</strong></p>
+                <p class="card-meta">
+                    {% if g.user.role == 'produtor' %}
+                        Produtor
+                    {% elif g.user.role == 'veterinario' %}
+                        Veterinário
+                    {% else %}
+                        Usuário
+                    {% endif %}
+                    {% if g.user.city %}
+                        • {{ g.user.city }}
+                    {% endif %}
+                </p>
+                <a href="{{ url_for('profile', user_id=g.user.id) }}" class="btn btn-outline btn-full">Ver meu perfil</a>
+                <a href="{{ url_for('new_product') }}" class="btn btn-secondary btn-full">Cadastrar produto</a>
+            </div>
+        {% else %}
+            <div class="card">
+                <h2>Comece agora</h2>
+                <p class="card-meta">Crie sua conta para anunciar e conversar com veterinários.</p>
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-full">Cadastrar</a>
+            </div>
+        {% endif %}
+    </aside>
+
+    <main class="home-column home-center">
+        <section class="section no-margin-top">
+            <div class="section-header">
+                <h2>Ofertas recentes</h2>
+                <a href="{{ url_for('marketplace') }}">Ver todas</a>
+            </div>
+            <div class="card-grid">
+                {% for p in products %}
+                    <article class="card">
+                        {% if p.image_path %}
+                            <img src="{{ url_for('static', filename=p.image_path) }}" alt="Imagem do produto {{ p.title }}" class="card-image">
+                        {% endif %}
+                        <h3>{{ p.title }}</h3>
+                        <p class="card-meta">
+                            Por {{ p.producer_name }}{% if p.city %} • {{ p.city }}{% endif %}
+                        </p>
+                        <p class="card-description">{{ p.description|truncate(140) }}</p>
+                        {% if p.price %}
+                            <p class="price">R$ {{ p.price }}</p>
+                        {% endif %}
+                        {% if g.user and g.user.id != p.producer_id %}
+                            <a href="{{ url_for('chat', user_id=p.producer_id, product_id=p.id) }}" class="btn btn-primary btn-sm">
+                                Mandar mensagem
+                            </a>
+                        {% endif %}
+                    </article>
+                {% else %}
+                    <p>Nenhum produto cadastrado ainda.</p>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+
+    <aside class="home-column home-right">
+        <section class="section no-margin-top">
+            <div class="section-header">
+                <h2>Veterinários em destaque</h2>
+                <a href="{{ url_for('vets') }}">Ver todos</a>
+            </div>
+            <div class="card-grid">
+                {% for v in vets %}
+                    <article class="card">
+                        <img
+                            src="https://images.unsplash.com/photo-1554224154-22dec7ec8818?auto=format&fit=crop&w=800&q=80"
+                            alt="Foto ilustrativa de veterinário"
+                            class="card-image"
+                        >
+                        <h3>{{ v.name }}</h3>
+                        <p class="card-meta">
+                            Veterinário{% if v.city %} • {{ v.city }}{% endif %}
+                        </p>
+                        <p class="card-description">
+                            {{ v.bio or "Profissional disponível para atendimentos e consultorias." }}
+                        </p>
+                        <a href="{{ url_for('message_vet', vet_id=v.id) }}" class="btn btn-secondary btn-full">
+                            Entrar em contato
+                        </a>
+                    </article>
+                {% else %}
+                    <p>Ainda não há veterinários cadastrados.</p>
+                {% endfor %}
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}
+
