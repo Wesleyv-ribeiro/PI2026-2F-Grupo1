@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from datetime import datetime
 import re
 from pathlib import Path
@@ -63,16 +64,29 @@ DEFAULT_DATABASE_URL = os.getenv(
 )
 
 
-class PostgresCompatConnection:
-    """Conexão PostgreSQL com API simples para execute/commit/close."""
+class DBConnectionWrapper:
+    """Wrapper genérico para conexões sqlite3 e psycopg2 com execute/commit/close."""
 
-    def __init__(self, conn):
+    def __init__(self, conn, db_type):
         self._conn = conn
+        self.db_type = db_type
+        if db_type == "sqlite":
+            self._conn.row_factory = sqlite3.Row
+
+    def _normalize_query(self, query: str) -> str:
+        if self.db_type == "postgres":
+            return query.replace("?", "%s")
+        if self.db_type == "sqlite":
+            return query.replace("%s", "?")
+        return query
 
     def execute(self, query, params=None):
-        pg_query = query.replace("?", "%s")
-        cur = self._conn.cursor(cursor_factory=DictCursor)
-        cur.execute(pg_query, params or ())
+        normalized_query = self._normalize_query(query)
+        if self.db_type == "postgres":
+            cur = self._conn.cursor(cursor_factory=DictCursor)
+        else:
+            cur = self._conn.cursor()
+        cur.execute(normalized_query, params or ())
         return cur
 
     def commit(self):
@@ -101,17 +115,15 @@ def connect_db():
             )
 
         raw_conn = _do_connect()
-        return PostgresCompatConnection(raw_conn)
-    except OperationalError as exc:
-        error_details = repr(exc)
-        if exc.args:
-            error_details += " | args=" + repr(exc.args)
-        raise RuntimeError(
-            "Nao foi possivel conectar ao PostgreSQL. "
-            "Verifique se o servidor está rodando, se o DB existe e se a URL está correta. "
-            "Exemplo: postgresql://agrolink:Morango@127.0.0.1:5432/agrolink\n"
-            f"Detalhes do erro: {error_details}"
-        ) from exc
+        return DBConnectionWrapper(raw_conn, "postgres")
+    except OperationalError:
+        sqlite_path = Path(BASE_DIR) / "agrolink.sqlite3"
+        raw_conn = sqlite3.connect(
+            str(sqlite_path),
+            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+        )
+        raw_conn.execute("PRAGMA foreign_keys = ON")
+        return DBConnectionWrapper(raw_conn, "sqlite")
 
 VALID_UFS = {
     "AC",
@@ -334,7 +346,7 @@ def create_app():
                 g.unread_count = (
                     db.execute(
                         """
-                        SELECT COUNT(*) FROM messages
+                        SELECT COUNT(*) AS count FROM messages
                         WHERE receiver_id = ? AND is_read = 0
                         """,
                         (user_id,),
@@ -377,7 +389,89 @@ def create_app():
             LIMIT 6
             """
         ).fetchall()
-        return render_template("index.html", products=products, vets=vets)
+        producers = db.execute(
+            """
+            SELECT
+                u.id, u.name, u.city, u.bio, u.profile_image,
+                (SELECT COUNT(*) FROM products pr WHERE pr.producer_id = u.id) AS product_count
+            FROM users u
+            WHERE u.role = 'produtor'
+            ORDER BY product_count DESC, u.id DESC
+            LIMIT 6
+            """
+        ).fetchall()
+        cities = db.execute(
+            """
+            SELECT DISTINCT city
+            FROM users
+            WHERE city IS NOT NULL AND city <> ''
+            ORDER BY city
+            """
+        ).fetchall()
+
+        # Monta uma lista única de "destaques" (produtores, veterinários e
+        # produtos), intercalando os tipos para que a grade central não
+        # fique agrupada por categoria.
+        highlight_products = [
+            {
+                "type": "produto",
+                "id": p["id"],
+                "title": p["title"],
+                "subtitle": p["producer_name"],
+                "city": p["city"],
+                "desc": p["description"],
+                "image": p["image_path"],
+                "price": p["price"],
+                "link_id": p["producer_id"],
+            }
+            for p in products[:6]
+        ]
+        highlight_vets = [
+            {
+                "type": "veterinario",
+                "id": v["id"],
+                "title": v["name"],
+                "subtitle": "Veterinário(a)",
+                "city": v["city"],
+                "desc": v["bio"],
+                "image": None,
+                "price": None,
+                "link_id": v["id"],
+            }
+            for v in vets
+        ]
+        highlight_producers = [
+            {
+                "type": "produtor",
+                "id": pr["id"],
+                "title": pr["name"],
+                "subtitle": f"{pr['product_count']} produto(s) anunciado(s)",
+                "city": pr["city"],
+                "desc": pr["bio"],
+                "image": pr["profile_image"],
+                "price": None,
+                "link_id": pr["id"],
+            }
+            for pr in producers
+        ]
+
+        highlights = []
+        sources = [highlight_producers, highlight_vets, highlight_products]
+        while any(sources):
+            for source in sources:
+                if source:
+                    highlights.append(source.pop(0))
+        highlights = highlights[:9]
+
+        city_names = [row["city"] for row in cities]
+
+        return render_template(
+            "index.html",
+            products=products,
+            vets=vets,
+            highlights=highlights,
+            cities=city_names,
+        )
 
     @app.route("/register", methods=["GET", "POST"])
     def register():
@@ -979,7 +1073,7 @@ def create_app():
                     """
                     INSERT INTO services
                         (provider_id, title, description, category, price, location, contact, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (g.user["id"], title, description,
                      category or None, price or None,
@@ -1027,7 +1121,7 @@ def create_app():
                     """
                     INSERT INTO animal_reports
                         (user_id, title, description, species, urgency, location, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (g.user["id"], title, description, species,
                      urgency, location or None, datetime.utcnow()),
@@ -1115,10 +1209,17 @@ def get_db():
 
 def init_db():
     db = connect_db()
+    if db.db_type == "postgres":
+        pk_type = "SERIAL"
+        fk_template = "REFERENCES users (id)"
+    else:
+        pk_type = "INTEGER PRIMARY KEY AUTOINCREMENT"
+        fk_template = "REFERENCES users (id)"
+
     db.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
+            id {pk_type},
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
@@ -1133,10 +1234,10 @@ def init_db():
         """
     )
     db.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS products (
-            id SERIAL PRIMARY KEY,
-            producer_id INTEGER NOT NULL REFERENCES users (id),
+            id {pk_type},
+            producer_id INTEGER NOT NULL {fk_template},
             title TEXT NOT NULL,
             description TEXT NOT NULL,
             price TEXT,
@@ -1146,11 +1247,11 @@ def init_db():
         """
     )
     db.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS messages (
-            id SERIAL PRIMARY KEY,
-            sender_id INTEGER NOT NULL REFERENCES users (id),
-            receiver_id INTEGER NOT NULL REFERENCES users (id),
+            id {pk_type},
+            sender_id INTEGER NOT NULL {fk_template},
+            receiver_id INTEGER NOT NULL {fk_template},
             content TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL,
             is_read INTEGER NOT NULL DEFAULT 0
@@ -1159,10 +1260,10 @@ def init_db():
     )
 
     db.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS services (
-            id SERIAL PRIMARY KEY,
-            provider_id INTEGER NOT NULL REFERENCES users (id),
+            id {pk_type},
+            provider_id INTEGER NOT NULL {fk_template},
             title TEXT NOT NULL,
             description TEXT NOT NULL,
             category TEXT,
@@ -1175,10 +1276,10 @@ def init_db():
     )
 
     db.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS animal_reports (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users (id),
+            id {pk_type},
+            user_id INTEGER NOT NULL {fk_template},
             title TEXT NOT NULL,
             description TEXT NOT NULL,
             species TEXT,
@@ -1231,7 +1332,7 @@ def seed_admin():
                 profile_image,
                 is_admin
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "Administrador",

@@ -28,10 +28,10 @@
   <!-- MAIN COLS -->
   <div class="home-cols">
 
-    <!-- LEFT: resumo / cta -->
+    <!-- LEFT: resumo / cta + filtro -->
     <aside>
       {% if g.user %}
-        <div class="card" style="position:sticky;top:80px;">
+        <div class="card sidebar-sticky" style="position:sticky;top:80px;">
           <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;">
             <div class="avatar-placeholder avatar-lg" style="font-size:1.3rem;">
               {{ g.user.name[0]|upper }}
@@ -53,21 +53,167 @@
               <a href="{{ url_for('new_product') }}" class="btn btn-primary btn-sm btn-full">+ Novo produto</a>
             {% endif %}
           </div>
+
+          <!-- FILTRO DE DESTAQUES -->
+          <div class="divider"></div>
+          <div class="filter-card">
+            <h3 class="filter-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
+              Filtrar destaques
+            </h3>
+
+            <div class="filter-group">
+              <span class="filter-label">Categoria</span>
+              <div class="filter-options">
+                <label class="filter-chip">
+                  <input type="checkbox" class="filter-category" value="produto" checked>
+                  <span>Produtos</span>
+                </label>
+                <label class="filter-chip">
+                  <input type="checkbox" class="filter-category" value="veterinario" checked>
+                  <span>Veterinários</span>
+                </label>
+                <label class="filter-chip">
+                  <input type="checkbox" class="filter-category" value="produtor" checked>
+                  <span>Produtores</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label" for="filter-city">Cidade</label>
+              <select id="filter-city" class="filter-select">
+                <option value="">Todas as cidades</option>
+                {% for c in cities %}
+                  <option value="{{ c|lower }}">{{ c }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <button type="button" id="filter-reset" class="btn btn-ghost btn-sm btn-full">Limpar filtros</button>
+          </div>
         </div>
       {% else %}
-        <div class="card" style="text-align:center;">
-          <div class="avatar-placeholder avatar-xl" style="margin:0 auto 1rem;font-size:2rem;">C</div>
-          <h3 style="margin-bottom:0.5rem;">Comece agora</h3>
-          <p class="card-meta mb-3">Crie sua conta gratuita para anunciar, comprar e consultar veterinários.</p>
-          <a href="{{ url_for('register') }}" class="btn btn-primary btn-full mb-1">Cadastrar grátis</a>
-          <a href="{{ url_for('login') }}"    class="btn btn-outline btn-full">Já tenho conta</a>
+        <div class="sidebar-sticky" style="position:sticky;top:80px;display:flex;flex-direction:column;gap:1.25rem;">
+          <div class="card" style="text-align:center;">
+            <div class="avatar-placeholder avatar-xl" style="margin:0 auto 1rem;font-size:2rem;">C</div>
+            <h3 style="margin-bottom:0.5rem;">Comece agora</h3>
+            <p class="card-meta mb-3">Crie sua conta gratuita para anunciar, comprar e consultar veterinários.</p>
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-full mb-1">Cadastrar grátis</a>
+            <a href="{{ url_for('login') }}"    class="btn btn-outline btn-full">Já tenho conta</a>
+          </div>
+
+          <!-- FILTRO DE DESTAQUES -->
+          <div class="card filter-card">
+            <h3 class="filter-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
+              Filtrar destaques
+            </h3>
+
+            <div class="filter-group">
+              <span class="filter-label">Categoria</span>
+              <div class="filter-options">
+                <label class="filter-chip">
+                  <input type="checkbox" class="filter-category" value="produto" checked>
+                  <span>🌾 Produtos</span>
+                </label>
+                <label class="filter-chip">
+                  <input type="checkbox" class="filter-category" value="veterinario" checked>
+                  <span>🩺 Veterinários</span>
+                </label>
+                <label class="filter-chip">
+                  <input type="checkbox" class="filter-category" value="produtor" checked>
+                  <span>🚜 Produtores</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label" for="filter-city">Cidade</label>
+              <select id="filter-city" class="filter-select">
+                <option value="">Todas as cidades</option>
+                {% for c in cities %}
+                  <option value="{{ c|lower }}">{{ c }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <button type="button" id="filter-reset" class="btn btn-ghost btn-sm btn-full">Limpar filtros</button>
+          </div>
         </div>
       {% endif %}
     </aside>
 
-    <!-- CENTER: produtos recentes -->
+    <!-- CENTER: grade de destaques (produtores, veterinários e produtos) -->
     <main>
       <div class="section-header">
+        <h2>Destaques</h2>
+        <span id="filter-count" class="card-meta"></span>
+      </div>
+
+      <div class="card-grid" id="highlights-grid">
+        {% for h in highlights %}
+          <article class="card card-hover highlight-card" data-type="{{ h.type }}" data-city="{{ (h.city or '')|lower }}">
+
+            {% if h.type == 'produto' %}
+              {% if h.image %}
+                <img src="{{ url_for('static', filename=h.image) }}" alt="{{ h.title }}" class="card-image">
+              {% else %}
+                <div class="card-image" style="background:linear-gradient(135deg,var(--sky),var(--cream));display:flex;align-items:center;justify-content:center;color:var(--muted);">
+                  <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 3H8l-2 4h12l-2-4z"/></svg>
+                </div>
+              {% endif %}
+              <span class="card-tag tag-green">Produto</span>
+              <h3 class="card-title">{{ h.title }}</h3>
+              <p class="card-meta">Por {{ h.subtitle }}{% if h.city %} &bull; {{ h.city }}{% endif %}</p>
+              <p class="card-desc">{{ h.desc|truncate(100) }}</p>
+              {% if h.price %}<p class="price">R$ {{ h.price }}</p>{% endif %}
+              <div class="card-actions">
+                <a href="{{ url_for('profile', user_id=h.link_id) }}" class="btn btn-outline btn-sm">Ver produtor</a>
+                {% if g.user and g.user.id != h.link_id %}
+                  <a href="{{ url_for('chat', user_id=h.link_id, product_id=h.id) }}" class="btn btn-primary btn-sm">Mensagem</a>
+                {% endif %}
+              </div>
+
+            {% elif h.type == 'veterinario' %}
+              <div class="avatar-placeholder avatar-md" style="margin-bottom:1rem;">{{ h.title[0]|upper }}</div>
+              <span class="card-tag tag-blue">Veterinário</span>
+              <h3 class="card-title">{{ h.title }}</h3>
+              <p class="card-meta">{% if h.city %}{{ h.city }}{% else %}Local não informado{% endif %}</p>
+              {% if h.desc %}<p class="card-desc">{{ h.desc|truncate(100) }}</p>{% endif %}
+              <div class="card-actions">
+                <a href="{{ url_for('message_vet', vet_id=h.link_id) }}" class="btn btn-secondary btn-sm">Entrar em contato</a>
+              </div>
+
+            {% elif h.type == 'produtor' %}
+              {% if h.image %}
+                <img src="{{ url_for('static', filename=h.image) }}" alt="{{ h.title }}" class="avatar avatar-md" style="margin-bottom:1rem;">
+              {% else %}
+                <div class="avatar-placeholder avatar-md" style="margin-bottom:1rem;">{{ h.title[0]|upper }}</div>
+              {% endif %}
+              <span class="card-tag tag-gold">Produtor</span>
+              <h3 class="card-title">{{ h.title }}</h3>
+              <p class="card-meta">{% if h.city %}{{ h.city }} &bull; {% endif %}{{ h.subtitle }}</p>
+              {% if h.desc %}<p class="card-desc">{{ h.desc|truncate(100) }}</p>{% endif %}
+              <div class="card-actions">
+                <a href="{{ url_for('profile', user_id=h.link_id) }}" class="btn btn-outline btn-sm">Ver perfil</a>
+              </div>
+            {% endif %}
+
+          </article>
+        {% else %}
+          <div class="empty">
+            <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/></svg>
+            <p>Nenhum destaque disponível ainda.</p>
+          </div>
+        {% endfor %}
+        <div class="empty" id="filter-empty" style="display:none;">
+          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35"/></svg>
+          <p>Nenhum resultado para os filtros selecionados.</p>
+        </div>
+      </div>
+
+      <div class="section-header" style="margin-top:2.5rem;">
         <h2>Ofertas recentes</h2>
         <a href="{{ url_for('marketplace') }}">Ver todas →</a>
       </div>
