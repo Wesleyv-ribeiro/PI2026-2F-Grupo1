@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}CONCOOP — Conectando o campo{% endblock %}
+{% block title %}CONCOOP — Rede do Produtor Rural{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -8,50 +8,49 @@
   <section class="hero">
     <div class="hero-inner">
       <div class="hero-label">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
-        Plataforma do Produtor Rural
+        <svg width="6" height="6" viewBox="0 0 6 6" fill="currentColor"><circle cx="3" cy="3" r="3"/></svg>
+        Rede Cooperativa Rural
       </div>
-      <h1>A rede que conecta quem produz ao campo</h1>
-      <p>Anuncie produtos, consulte veterinarios e encontre compradores — tudo em um so lugar.</p>
+      <h1>De produtor<br>para produtor.</h1>
+      <p>Compre, venda, consulte veterinários e divulgue serviços. Uma plataforma construída para quem trabalha no campo.</p>
       <div class="hero-btns">
         {% if not g.user %}
-          <a href="{{ url_for('register') }}" class="btn btn-gold btn-lg">Criar minha conta</a>
-          <a href="{{ url_for('login') }}"    class="btn btn-outline btn-lg" style="border-color:rgba(255,255,255,.35);color:#fff;">Ja tenho conta</a>
+          <a href="{{ url_for('register') }}" class="btn btn-hero-light btn-lg">Criar conta gratuita</a>
+          <a href="{{ url_for('login') }}"    class="btn btn-hero-outline btn-lg">Entrar</a>
         {% else %}
-          <a href="{{ url_for('dashboard') }}"   class="btn btn-gold btn-lg">Meu painel</a>
-          <a href="{{ url_for('marketplace') }}" class="btn btn-outline btn-lg" style="border-color:rgba(255,255,255,.35);color:#fff;">Ver mercado</a>
+          <a href="{{ url_for('marketplace') }}" class="btn btn-hero-light btn-lg">Ver ofertas</a>
+          <a href="{{ url_for('dashboard') }}"   class="btn btn-hero-outline btn-lg">Meu painel</a>
         {% endif %}
       </div>
     </div>
   </section>
 
-  <!-- ESTATÍSTICAS -->
+  <!-- STATS -->
   <div class="stat-grid" style="margin-bottom:3rem;">
     <div class="stat-card">
-      <div class="stat-number">{{ products|length }}+</div>
-      <div class="stat-label">Produtos anunciados</div>
+      <div class="stat-number">{{ products|length }}</div>
+      <div class="stat-label">Produtos</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number">{{ vets|length }}+</div>
-      <div class="stat-label">Veterinarios verificados</div>
+      <div class="stat-number">{{ vets|length }}</div>
+      <div class="stat-label">Veterinarios</div>
     </div>
     <div class="stat-card">
       <div class="stat-number">100%</div>
-      <div class="stat-label">Gratuito para produtores</div>
+      <div class="stat-label">Gratuito</div>
     </div>
     <div class="stat-card">
       <div class="stat-number">24h</div>
-      <div class="stat-label">Suporte da comunidade</div>
+      <div class="stat-label">Comunidade</div>
     </div>
   </div>
 
-  <!-- PRODUTOS RECENTES -->
+  <!-- PRODUTOS -->
   <section class="section">
     <div class="section-header">
       <h2>Ofertas recentes</h2>
-      <a href="{{ url_for('marketplace') }}">Ver todas</a>
+      <a href="{{ url_for('marketplace') }}">Ver tudo</a>
     </div>
-
     <div class="market-grid">
       {% for p in products %}
         <article class="market-card">
@@ -60,7 +59,7 @@
               <img src="{{ url_for('static', filename=p.image_path) }}" alt="{{ p.title }}">
             {% else %}
               <div class="market-card-img-placeholder">
-                <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24">
+                <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24">
                   <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
                   <path d="M16 3H8l-2 4h12l-2-4z"/>
                 </svg>
@@ -68,9 +67,9 @@
             {% endif %}
           </div>
           <div class="market-card-body">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
-              <span class="card-tag tag-green" style="margin-bottom:0;">Produto Rural</span>
-              {% if p.city %}<span style="font-size:0.75rem;color:var(--muted);">{{ p.city }}</span>{% endif %}
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+              <span class="card-tag tag-green" style="margin:0;">Produto</span>
+              {% if p.city %}<span style="font-size:0.71rem;color:var(--text-muted);">{{ p.city }}</span>{% endif %}
             </div>
             <h3 class="market-card-title">{{ p.title }}</h3>
             <p class="market-card-producer">{{ p.producer_name }}</p>
@@ -85,38 +84,38 @@
           </div>
         </article>
       {% else %}
-        <div class="empty" style="grid-column:1/-1;">
-          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <div class="empty">
+          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24">
             <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-            <path d="M16 3H8l-2 4h12l-2-4z"/>
           </svg>
-          <p>Nenhum produto cadastrado ainda.</p>
+          <p>Nenhum produto ainda. Seja o primeiro a anunciar.</p>
         </div>
       {% endfor %}
     </div>
   </section>
 
-  <!-- VETERINÁRIOS -->
+  <!-- VETERINARIOS -->
   {% if vets %}
   <section class="section">
     <div class="section-header">
-      <h2>Veterinarios em destaque</h2>
+      <h2>Veterinarios disponiveis</h2>
       <a href="{{ url_for('vets') }}">Ver todos</a>
     </div>
     <div class="vets-row">
       {% for v in vets[:4] %}
         <div class="vet-item">
           <div class="vet-item-avatar">{{ v.name[0]|upper }}</div>
-          <div class="vet-item-info">
-            <div style="display:flex;align-items:center;gap:0.6rem;">
-              <h3 class="vet-item-name">{{ v.name }}</h3>
-              <span class="badge badge-green" style="font-size:0.68rem;">Verificado</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+              <span class="vet-item-name">{{ v.name }}</span>
+              <span class="badge badge-green">Verificado</span>
             </div>
             {% if v.city %}<p class="vet-item-city">{{ v.city }}</p>{% endif %}
             {% if v.bio %}<p class="vet-item-bio">{{ v.bio|truncate(100) }}</p>{% endif %}
           </div>
           <div class="vet-item-action">
             <a href="{{ url_for('message_vet', vet_id=v.id) }}" class="btn btn-primary btn-sm">Contatar</a>
+            <a href="{{ url_for('profile', user_id=v.id) }}" class="btn btn-outline btn-sm">Perfil</a>
           </div>
         </div>
       {% endfor %}
@@ -125,60 +124,4 @@
   {% endif %}
 
 </div>
-{% endblock %}
-
-{% block scripts %}
-<style>
-.market-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1.25rem;
-}
-.market-card {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: transform .2s, box-shadow .2s;
-  display: flex;
-  flex-direction: column;
-}
-.market-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
-.market-card-img { width:100%; height:160px; overflow:hidden; background:var(--cream); flex-shrink:0; }
-.market-card-img img { width:100%; height:100%; object-fit:cover; transition:transform .3s; }
-.market-card:hover .market-card-img img { transform:scale(1.04); }
-.market-card-img-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--muted); background:linear-gradient(135deg,#f0fdf4,#e7e8c3); }
-.market-card-body { padding:1rem; display:flex; flex-direction:column; flex:1; }
-.market-card-title { font-family:'Playfair Display',serif; font-size:0.95rem; font-weight:700; color:var(--soil); margin-bottom:0.15rem; line-height:1.3; }
-.market-card-producer { font-size:0.75rem; color:var(--muted); margin-bottom:0.4rem; }
-.market-card-desc { font-size:0.8rem; color:var(--muted); line-height:1.5; flex:1; }
-.market-card-price { font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:700; color:var(--field-dim); margin-top:0.5rem; }
-.market-card-actions { display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap; }
-
-.vets-row { display:flex; flex-direction:column; gap:0.85rem; }
-.vet-item {
-  background:var(--white); border:1px solid var(--border); border-radius:var(--r-lg);
-  padding:1.1rem 1.5rem; display:grid; grid-template-columns:48px 1fr auto;
-  gap:1.1rem; align-items:center; box-shadow:var(--shadow-sm);
-  transition:box-shadow .2s, border-color .2s;
-}
-.vet-item:hover { box-shadow:var(--shadow-md); border-color:rgba(3,76,0,.2); }
-.vet-item-avatar {
-  width:48px; height:48px; border-radius:50%;
-  background:linear-gradient(135deg,var(--field),var(--soil));
-  color:#fff; font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:700;
-  display:grid; place-items:center; flex-shrink:0;
-}
-.vet-item-name { font-family:'Playfair Display',serif; font-size:0.95rem; font-weight:700; color:var(--soil); }
-.vet-item-city { font-size:0.8rem; color:var(--muted); margin-top:0.1rem; }
-.vet-item-crmv { font-size:0.75rem; color:var(--muted); margin-top:0.1rem; }
-.vet-item-bio  { font-size:0.8rem; color:var(--muted); margin-top:0.35rem; line-height:1.5; }
-.vet-item-action { display:flex; flex-direction:column; gap:0.4rem; flex-shrink:0; }
-
-@media (max-width:640px) {
-  .vet-item { grid-template-columns:40px 1fr; }
-  .vet-item-action { grid-column:1/-1; flex-direction:row; }
-}
-</style>
 {% endblock %}
