@@ -1,0 +1,59 @@
+{% macro product_card(p, chat_label='Contatar') %}
+<article class="product-card"
+         data-title="{{ p.title|lower }}"
+         data-city="{{ (p.city or '')|lower }}"
+         data-producer="{{ p.producer_name|lower }}"
+         data-desc="{{ (p.description or '')|lower }}"
+         data-price="{{ p.price or '' }}"
+         data-date="{{ p.created_at }}">
+  <a href="{{ url_for('profile', user_id=p.producer_id) }}" class="product-card-img-link" tabindex="-1" aria-hidden="true">
+    <div class="product-card-img">
+      {% if p.image_path %}
+        <img src="{{ url_for('static', filename=p.image_path) }}" alt="{{ p.title }}" loading="lazy">
+      {% else %}
+        <div class="product-card-img-placeholder">
+          <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+            <path d="M16 3H8l-2 4h12l-2-4z"/>
+          </svg>
+        </div>
+      {% endif %}
+      {% if p.city %}
+        <span class="product-card-location">{{ p.city }}</span>
+      {% endif %}
+    </div>
+  </a>
+
+  <div class="product-card-body">
+    <span class="card-tag tag-green product-card-tag">Produto Rural</span>
+    <h3 class="product-card-title">
+      <a href="{{ url_for('profile', user_id=p.producer_id) }}">{{ p.title }}</a>
+    </h3>
+
+    <div class="product-card-producer-row">
+      <span class="product-card-avatar">{{ p.producer_name[0]|upper }}</span>
+      <span class="product-card-producer">{{ p.producer_name }}</span>
+    </div>
+
+    {% if p.description %}
+      <p class="product-card-desc">{{ p.description|truncate(90) }}</p>
+    {% endif %}
+
+    <div class="product-card-footer">
+      <div class="product-card-price-wrap">
+        {% if p.price %}
+          <span class="product-card-price">R$ {{ p.price }}</span>
+        {% else %}
+          <span class="product-card-price product-card-price--na">Consultar</span>
+        {% endif %}
+      </div>
+      <div class="product-card-actions">
+        <a href="{{ url_for('profile', user_id=p.producer_id) }}" class="btn btn-outline btn-sm">Produtor</a>
+        {% if g.user and g.user.id != p.producer_id %}
+          <a href="{{ url_for('chat', user_id=p.producer_id, product_id=p.id) }}" class="btn btn-primary btn-sm">{{ chat_label }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</article>
+{% endmacro %}

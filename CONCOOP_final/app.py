@@ -641,7 +641,11 @@ def create_app():
             ORDER BY p.created_at DESC
             """
         ).fetchall()
-        return render_template("marketplace.html", products=products)
+        cities = sorted(
+            {row["city"] for row in products if row["city"]},
+            key=str.casefold,
+        )
+        return render_template("marketplace.html", products=products, cities=cities)
 
     @app.route("/vets")
     def vets():

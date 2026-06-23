@@ -1,32 +1,63 @@
 {% extends "base.html" %}
+{% from "_carousel.html" import render_carousel %}
+{% from "_product_card.html" import product_card %}
+
 {% block title %}CONCOOP — Rede do Produtor Rural{% endblock %}
 
 {% block content %}
 <div class="container">
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-inner">
-      <div class="hero-label">
-        <svg width="6" height="6" viewBox="0 0 6 6" fill="currentColor"><circle cx="3" cy="3" r="3"/></svg>
-        Rede Cooperativa Rural
-      </div>
-      <h1>De produtor<br>para produtor.</h1>
-      <p>Compre, venda, consulte veterinários e divulgue serviços. Uma plataforma construída para quem trabalha no campo.</p>
-      <div class="hero-btns">
-        {% if not g.user %}
-          <a href="{{ url_for('register') }}" class="btn btn-hero-light btn-lg">Criar conta gratuita</a>
-          <a href="{{ url_for('login') }}"    class="btn btn-hero-outline btn-lg">Entrar</a>
-        {% else %}
-          <a href="{{ url_for('marketplace') }}" class="btn btn-hero-light btn-lg">Ver ofertas</a>
-          <a href="{{ url_for('dashboard') }}"   class="btn btn-hero-outline btn-lg">Meu painel</a>
-        {% endif %}
-      </div>
-    </div>
-  </section>
+  {{ render_carousel("hero-carousel", [
+    {
+      "label": "Rede Cooperativa Rural",
+      "title": "De produtor<br>para produtor.",
+      "text": "Compre, venda, consulte veterinários e divulgue serviços. Uma plataforma construída para quem trabalha no campo.",
+      "image": url_for('static', filename='img/carousel-field.jpg'),
+      "visual": "logo",
+      "btns": [
+        {"href": url_for('register') if not g.user else url_for('marketplace'), "text": "Criar conta gratuita" if not g.user else "Ver ofertas", "class": "btn-hero-light btn-lg"},
+        {"href": url_for('login') if not g.user else url_for('dashboard'), "text": "Entrar" if not g.user else "Meu painel", "class": "btn-hero-outline btn-lg"}
+      ]
+    },
+    {
+      "label": "Mercado Rural",
+      "title": "Compre e venda<br>direto do campo.",
+      "text": "Anuncie seus produtos e encontre ofertas de outros produtores da região, sem intermediários.",
+      "image": url_for('static', filename='img/carousel-harvest.jpg'),
+      "visual": "img/carousel-harvest.jpg",
+      "image_alt": "Colheita rural",
+      "btns": [
+        {"href": url_for('marketplace'), "text": "Ver ofertas", "class": "btn-hero-light btn-lg"},
+        {"href": url_for('new_product') if g.user else url_for('register'), "text": "Anunciar produto" if g.user else "Começar agora", "class": "btn-hero-outline btn-lg"}
+      ]
+    },
+    {
+      "label": "Saúde Animal",
+      "title": "Veterinários<br>ao seu alcance.",
+      "text": "Encontre profissionais verificados, tire dúvidas e solicite atendimento para o seu rebanho.",
+      "image": url_for('static', filename='img/carousel-cattle.jpg'),
+      "visual": "img/carousel-cattle.jpg",
+      "image_alt": "Gado no campo",
+      "btns": [
+        {"href": url_for('vets'), "text": "Ver veterinários", "class": "btn-hero-light btn-lg"},
+        {"href": url_for('ajuda_animal'), "text": "Ajuda animal", "class": "btn-hero-outline btn-lg"}
+      ]
+    },
+    {
+      "label": "Comunidade",
+      "title": "Serviços e<br>parcerias locais.",
+      "text": "Divulgue serviços rurais, conecte-se com a comunidade e fortaleça a cooperativa da sua região.",
+      "image": url_for('static', filename='img/carousel-community.jpg'),
+      "visual": "img/carousel-community.jpg",
+      "image_alt": "Produtores rurais",
+      "btns": [
+        {"href": url_for('servicos'), "text": "Ver serviços", "class": "btn-hero-light btn-lg"},
+        {"href": url_for('novo_servico') if g.user else url_for('register'), "text": "Oferecer serviço" if g.user else "Participar", "class": "btn-hero-outline btn-lg"}
+      ]
+    }
+  ]) }}
 
-  <!-- STATS -->
-  <div class="stat-grid" style="margin-bottom:3rem;">
+  <div class="stat-grid mb-3">
     <div class="stat-card">
       <div class="stat-number">{{ products|length }}</div>
       <div class="stat-label">Produtos</div>
@@ -45,47 +76,17 @@
     </div>
   </div>
 
-  <!-- PRODUTOS -->
   <section class="section">
     <div class="section-header">
       <h2>Ofertas recentes</h2>
-      <a href="{{ url_for('marketplace') }}">Ver tudo</a>
+      <a href="{{ url_for('marketplace') }}">Ver tudo →</a>
     </div>
-    <div class="market-grid">
-      {% for p in products %}
-        <article class="market-card">
-          <div class="market-card-img">
-            {% if p.image_path %}
-              <img src="{{ url_for('static', filename=p.image_path) }}" alt="{{ p.title }}">
-            {% else %}
-              <div class="market-card-img-placeholder">
-                <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24">
-                  <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-                  <path d="M16 3H8l-2 4h12l-2-4z"/>
-                </svg>
-              </div>
-            {% endif %}
-          </div>
-          <div class="market-card-body">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
-              <span class="card-tag tag-green" style="margin:0;">Produto</span>
-              {% if p.city %}<span style="font-size:0.71rem;color:var(--text-muted);">{{ p.city }}</span>{% endif %}
-            </div>
-            <h3 class="market-card-title">{{ p.title }}</h3>
-            <p class="market-card-producer">{{ p.producer_name }}</p>
-            <p class="market-card-desc">{{ p.description|truncate(90) }}</p>
-            {% if p.price %}<p class="market-card-price">R$ {{ p.price }}</p>{% endif %}
-            <div class="market-card-actions">
-              <a href="{{ url_for('profile', user_id=p.producer_id) }}" class="btn btn-outline btn-sm">Produtor</a>
-              {% if g.user and g.user.id != p.producer_id %}
-                <a href="{{ url_for('chat', user_id=p.producer_id, product_id=p.id) }}" class="btn btn-primary btn-sm">Mensagem</a>
-              {% endif %}
-            </div>
-          </div>
-        </article>
+    <div class="product-grid product-grid--home">
+      {% for p in products[:8] %}
+        {{ product_card(p, chat_label='Mensagem') }}
       {% else %}
         <div class="empty">
-          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24">
+          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
           </svg>
           <p>Nenhum produto ainda. Seja o primeiro a anunciar.</p>
@@ -94,12 +95,11 @@
     </div>
   </section>
 
-  <!-- VETERINARIOS -->
   {% if vets %}
   <section class="section">
     <div class="section-header">
       <h2>Veterinarios disponiveis</h2>
-      <a href="{{ url_for('vets') }}">Ver todos</a>
+      <a href="{{ url_for('vets') }}">Ver todos →</a>
     </div>
     <div class="vets-row">
       {% for v in vets[:4] %}

@@ -13,8 +13,7 @@
 <header class="header">
   <div class="container header-inner">
     <a href="{{ url_for('index') }}" class="logo">
-      <span class="logo-leaf"></span>
-      CONCOOP
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="CONCOOP" class="logo-img">
     </a>
 
     <nav class="nav">
@@ -96,7 +95,7 @@
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <h3>CONCOOP</h3>
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="CONCOOP" class="footer-logo">
         <p>Conectando produtores rurais, veterinários e compradores em uma só plataforma.</p>
       </div>
       <div class="footer-col">

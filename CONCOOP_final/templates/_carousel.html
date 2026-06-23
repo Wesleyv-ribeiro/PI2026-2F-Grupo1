@@ -1,0 +1,69 @@
+{# Macro de carrossel reutilizável
+   slides: lista de dicts com keys:
+     label, title, text, image, image_alt (opcional),
+     btns: lista de {href, text, class}
+#}
+{% macro render_carousel(carousel_id, slides, compact=false) %}
+<section class="hero-carousel{% if compact %} hero-carousel--compact{% endif %}"
+         id="{{ carousel_id }}"
+         aria-label="Destaques"
+         aria-roledescription="carrossel"
+         tabindex="0">
+  <div class="carousel-viewport">
+    <div class="carousel-track">
+      {% for slide in slides %}
+      <article class="carousel-slide{% if loop.first %} is-active{% endif %}"
+               aria-hidden="{{ 'false' if loop.first else 'true' }}"
+               style="--slide-bg: url('{{ slide.image }}')">
+        <div class="carousel-slide-bg" aria-hidden="true"></div>
+        <div class="carousel-slide-inner">
+          <div class="carousel-slide-content">
+            <div class="hero-label">
+              <svg width="6" height="6" viewBox="0 0 6 6" fill="currentColor"><circle cx="3" cy="3" r="3"/></svg>
+              {{ slide.label }}
+            </div>
+            <h1>{{ slide.title|safe }}</h1>
+            <p>{{ slide.text }}</p>
+            {% if slide.btns %}
+            <div class="hero-btns">
+              {% for btn in slide.btns %}
+                <a href="{{ btn.href }}" class="btn {{ btn.class }}">{{ btn.text }}</a>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% if slide.visual %}
+          <div class="carousel-slide-visual">
+            {% if slide.visual == 'logo' %}
+              <img src="{{ url_for('static', filename='img/logo.png') }}" alt="CONCOOP" class="carousel-logo">
+            {% elif slide.visual.startswith('img/') %}
+              <img src="{{ url_for('static', filename=slide.visual) }}" alt="{{ slide.image_alt or slide.label }}" class="carousel-photo">
+            {% else %}
+              <img src="{{ slide.visual }}" alt="{{ slide.image_alt or slide.label }}" class="carousel-photo">
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+
+  <button type="button" class="carousel-btn carousel-prev" aria-label="Slide anterior">
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+  <button type="button" class="carousel-btn carousel-next" aria-label="Próximo slide">
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+
+  <div class="carousel-dots" role="tablist" aria-label="Slides do carrossel">
+    {% for slide in slides %}
+    <button type="button"
+            class="carousel-dot{% if loop.first %} is-active{% endif %}"
+            role="tab"
+            aria-selected="{{ 'true' if loop.first else 'false' }}"
+            aria-label="Slide {{ loop.index }}"></button>
+    {% endfor %}
+  </div>
+</section>
+{% endmacro %}

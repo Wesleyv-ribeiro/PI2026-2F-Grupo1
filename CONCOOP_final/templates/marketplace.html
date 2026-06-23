@@ -1,125 +1,116 @@
 {% extends "base.html" %}
+{% from "_carousel.html" import render_carousel %}
+{% from "_product_card.html" import product_card %}
+
 {% block title %}Mercado — CONCOOP{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top:2rem;padding-bottom:4rem;">
+<div class="container page-body">
 
-  <div class="page-header">
-    <h1>Mercado Rural</h1>
-    <p>Produtos diretamente dos produtores.</p>
+  {{ render_carousel("market-carousel", [
+    {
+      "label": "Mercado Rural",
+      "title": "Produtos frescos<br>direto do produtor.",
+      "text": "Grãos, hortaliças, mel, ovos e muito mais — negocie diretamente com quem produz.",
+      "image": url_for('static', filename='img/carousel-harvest.jpg'),
+      "visual": "img/carousel-harvest.jpg",
+      "image_alt": "Colheita de grãos",
+      "btns": [
+        {"href": "#produtos", "text": "Ver produtos", "class": "btn-hero-light btn-lg"},
+        {"href": url_for('new_product') if g.user else url_for('register'), "text": "Anunciar produto" if g.user else "Criar conta", "class": "btn-hero-outline btn-lg"}
+      ]
+    },
+    {
+      "label": "Sem intermediários",
+      "title": "Preço justo<br>para os dois lados.",
+      "text": "Compre com confiança e venda com visibilidade na maior rede cooperativa rural da região.",
+      "image": url_for('static', filename='img/carousel-market.jpg'),
+      "visual": "img/carousel-market.jpg",
+      "image_alt": "Produtos agrícolas",
+      "btns": [
+        {"href": "#produtos", "text": "Explorar ofertas", "class": "btn-hero-light btn-lg"}
+      ]
+    },
+    {
+      "label": "Da terra à mesa",
+      "title": "Qualidade que<br>vem do campo.",
+      "text": "Filtre por cidade, produto ou produtor e encontre exatamente o que precisa.",
+      "image": url_for('static', filename='img/carousel-field.jpg'),
+      "visual": "img/carousel-field.jpg",
+      "image_alt": "Campo ao amanhecer",
+      "btns": [
+        {"href": "#filtro", "text": "Filtrar produtos", "class": "btn-hero-light btn-lg"}
+      ]
+    }
+  ], compact=true) }}
+
+  <div class="market-page-header" id="produtos">
+    <div>
+      <h1>Mercado Rural</h1>
+      <p>Produtos diretamente dos produtores da cooperativa.</p>
+    </div>
+    {% if g.user and g.user.role == 'produtor' %}
+      <a href="{{ url_for('new_product') }}" class="btn btn-primary">+ Anunciar produto</a>
+    {% endif %}
   </div>
 
   <!-- FILTRO -->
-  <div class="card" style="padding:1.25rem 1.5rem;margin-bottom:2rem;">
-    <form method="GET" action="" id="filter-form" style="display:grid;grid-template-columns:1fr 1fr auto;gap:1rem;align-items:end;">
-      <div class="form-field" style="margin:0;">
-        <label>Buscar por nome</label>
+  <div class="market-controls" id="filtro">
+    <form method="GET" action="" id="filter-form" class="filter-bar">
+      <div class="form-field">
+        <label for="filter-q">Buscar</label>
         <input type="text" name="q" id="filter-q" value="{{ request.args.get('q','') }}" placeholder="Ex: milho, soja, mel...">
       </div>
-      <div class="form-field" style="margin:0;">
-        <label>Cidade / Estado</label>
+      <div class="form-field">
+        <label for="filter-cidade">Cidade / Estado</label>
         <input type="text" name="cidade" id="filter-cidade" value="{{ request.args.get('cidade','') }}" placeholder="Ex: Lages, SC">
       </div>
       <button type="submit" class="btn btn-primary">Filtrar</button>
     </form>
+
+    {% if cities %}
+    <div class="market-city-chips">
+      <span class="market-city-chips-label">Regiões:</span>
+      <button type="button" class="city-chip is-active" data-city="">Todas</button>
+      {% for city in cities %}
+        <button type="button" class="city-chip" data-city="{{ city|lower }}">{{ city }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="market-toolbar">
+      <p class="market-count"><strong id="market-count-num">{{ products|length }}</strong> produto{% if products|length != 1 %}s{% endif %} encontrado{% if products|length != 1 %}s{% endif %}</p>
+      <div class="market-sort">
+        <label for="market-sort">Ordenar por</label>
+        <select id="market-sort" class="market-sort-select">
+          <option value="recent">Mais recentes</option>
+          <option value="oldest">Mais antigos</option>
+          <option value="name-asc">Nome (A → Z)</option>
+          <option value="name-desc">Nome (Z → A)</option>
+          <option value="price-asc">Menor preço</option>
+          <option value="price-desc">Maior preço</option>
+        </select>
+      </div>
+    </div>
   </div>
 
   <!-- GRID MERCADO -->
-  {% set q = request.args.get('q','') | lower %}
-  {% set cidade = request.args.get('cidade','') | lower %}
-  {% set filtered = products | selectattr('title', 'defined') | list %}
-
-  <div class="market-grid">
-    {% set found = namespace(count=0) %}
+  <div class="product-grid" id="product-grid">
     {% for p in products %}
-      {% set match_q = not q or q in p.title|lower or q in (p.description or '')|lower %}
-      {% set match_c = not cidade or cidade in (p.city or '')|lower %}
-      {% if match_q and match_c %}
-        {% set found.count = found.count + 1 %}
-        <article class="market-card">
-          <div class="market-card-img">
-            {% if p.image_path %}
-              <img src="{{ url_for('static', filename=p.image_path) }}" alt="{{ p.title }}">
-            {% else %}
-              <div class="market-card-img-placeholder">
-                <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24">
-                  <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-                  <path d="M16 3H8l-2 4h12l-2-4z"/>
-                </svg>
-              </div>
-            {% endif %}
-          </div>
-          <div class="market-card-body">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
-              <span class="card-tag tag-green" style="margin-bottom:0;">Produto Rural</span>
-              {% if p.city %}<span style="font-size:0.75rem;color:var(--muted);">{{ p.city }}</span>{% endif %}
-            </div>
-            <h3 class="market-card-title">{{ p.title }}</h3>
-            <p class="market-card-producer">{{ p.producer_name }}</p>
-            <p class="market-card-desc">{{ p.description|truncate(100) }}</p>
-            {% if p.price %}
-              <p class="market-card-price">R$ {{ p.price }}</p>
-            {% endif %}
-            <div class="market-card-actions">
-              <a href="{{ url_for('profile', user_id=p.producer_id) }}" class="btn btn-outline btn-sm">Produtor</a>
-              {% if g.user and g.user.id != p.producer_id %}
-                <a href="{{ url_for('chat', user_id=p.producer_id, product_id=p.id) }}" class="btn btn-primary btn-sm">Contatar</a>
-              {% endif %}
-            </div>
-          </div>
-        </article>
-      {% endif %}
-    {% endfor %}
-
-    {% if found.count == 0 %}
-      <div class="empty" style="grid-column:1/-1;padding:4rem 2rem;">
-        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.3" viewBox="0 0 24 24">
+      {{ product_card(p) }}
+    {% else %}
+      <div class="empty market-empty" id="market-empty">
+        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.3" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
           <path d="M16 3H8l-2 4h12l-2-4z"/>
         </svg>
-        <p>Nenhum produto encontrado para o filtro aplicado.</p>
+        <p>Nenhum produto cadastrado ainda.</p>
         {% if g.user and g.user.role == 'produtor' %}
-          <a href="{{ url_for('new_product') }}" class="btn btn-primary" style="margin-top:1rem;">Anunciar produto</a>
+          <a href="{{ url_for('new_product') }}" class="btn btn-primary">Anunciar produto</a>
         {% endif %}
       </div>
-    {% endif %}
+    {% endfor %}
   </div>
 
 </div>
-{% endblock %}
-
-{% block scripts %}
-<style>
-.market-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 1.25rem;
-}
-.market-card {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: transform .2s, box-shadow .2s;
-  display: flex;
-  flex-direction: column;
-}
-.market-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
-.market-card-img { width:100%; height:180px; overflow:hidden; background:var(--cream); flex-shrink:0; }
-.market-card-img img { width:100%; height:100%; object-fit:cover; transition: transform .3s; }
-.market-card:hover .market-card-img img { transform: scale(1.04); }
-.market-card-img-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--muted); background:linear-gradient(135deg,#f0fdf4,#e7e8c3); }
-.market-card-body { padding:1.1rem; display:flex; flex-direction:column; flex:1; }
-.market-card-title { font-family:'Playfair Display',serif; font-size:0.98rem; font-weight:700; color:var(--soil); margin-bottom:0.2rem; line-height:1.3; }
-.market-card-producer { font-size:0.78rem; color:var(--muted); margin-bottom:0.5rem; }
-.market-card-desc { font-size:0.82rem; color:var(--muted); line-height:1.5; flex:1; }
-.market-card-price { font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:700; color:var(--field-dim); margin-top:0.6rem; }
-.market-card-actions { display:flex; gap:0.5rem; margin-top:0.85rem; flex-wrap:wrap; }
-
-/* Filter form responsive */
-@media (max-width:640px) {
-  #filter-form { grid-template-columns:1fr !important; }
-}
-</style>
 {% endblock %}
