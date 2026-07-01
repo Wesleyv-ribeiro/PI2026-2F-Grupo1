@@ -94,8 +94,19 @@
     </div>
   </div>
 
-  <!-- GRID MERCADO -->
-  <div class="product-grid" id="product-grid">
+  <!-- CATEGORY TABS + VIEW TOGGLE -->
+  <div class="category-tabs" id="category-tabs">
+    <button class="category-tab is-active" data-category="all">Todos</button>
+    <button class="category-tab" data-category="graos">🌾 Grãos</button>
+    <button class="category-tab" data-category="hortalicas">🥬 Hortaliças</button>
+    <button class="category-tab" data-category="frutas">🍎 Frutas</button>
+    <button class="category-tab" data-category="animais">🐄 Animais</button>
+    <button class="category-tab" data-category="derivados">🥛 Derivados</button>
+    <button class="category-tab" data-category="outros">📦 Outros</button>
+  </div>
+
+  <!-- GRID MERCADO (modo grid normal, oculto quando por categoria) -->
+  <div class="product-grid" id="product-grid" style="display:none;">
     {% for p in products %}
       {{ product_card(p) }}
     {% else %}
@@ -110,6 +121,62 @@
         {% endif %}
       </div>
     {% endfor %}
+  </div>
+
+  <!-- CATEGORY ROWS (modo carousel por linha) -->
+  <div id="category-rows">
+    {% if products %}
+
+    <!-- Fonte dos produtos para filtros e contagem -->
+    <div class="product-section product-section--source" data-section="all" aria-hidden="true">
+      <div class="product-section-header">
+        <div class="product-section-title">
+          <div class="product-section-icon">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+          </div>
+          Todos os produtos
+          <span class="product-section-count" id="all-count">{{ products|length }}</span>
+        </div>
+      </div>
+      <div class="product-row-wrap">
+        <button class="product-row-prev hidden" aria-label="Anterior">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="product-row" id="row-all">
+          {% for p in products %}
+            {{ product_card(p) }}
+          {% endfor %}
+        </div>
+        <button class="product-row-next" aria-label="Próximo">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Linhas por categoria (detectadas via JS a partir dos cards) -->
+    <div id="dynamic-category-rows"></div>
+
+    <!-- Empty state para filtros -->
+    <div class="empty" id="category-empty" style="display:none; margin-top:2rem;">
+      <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.3" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+        <path d="M16 3H8l-2 4h12l-2-4z"/>
+      </svg>
+      <p>Nenhum produto encontrado para esta categoria.</p>
+    </div>
+
+    {% else %}
+    <div class="empty market-empty">
+      <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.3" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+        <path d="M16 3H8l-2 4h12l-2-4z"/>
+      </svg>
+      <p>Nenhum produto cadastrado ainda.</p>
+      {% if g.user and g.user.role == 'produtor' %}
+        <a href="{{ url_for('new_product') }}" class="btn btn-primary">Anunciar produto</a>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
 
 </div>

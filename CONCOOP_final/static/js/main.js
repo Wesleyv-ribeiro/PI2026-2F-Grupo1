@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterQ        = document.getElementById('filter-q');
   const filterCidade   = document.getElementById('filter-cidade');
   const productGrid    = document.getElementById('product-grid');
-  const productCards   = document.querySelectorAll('.product-card');
+  const productCards   = productGrid ? productGrid.querySelectorAll('.product-card') : document.querySelectorAll('.product-card');
   const marketSort     = document.getElementById('market-sort');
   const marketCountNum = document.getElementById('market-count-num');
   const cityChips      = document.querySelectorAll('.city-chip');
@@ -168,7 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!input) return;
       input.addEventListener('input', () => {
         clearTimeout(debounce);
-        debounce = setTimeout(applyFilter, 200);
+        debounce = setTimeout(() => {
+          applyFilter();
+          if (categoryRows) applyCategoryRowFilter();
+        }, 200);
       });
     });
 
@@ -188,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activeCityChip = chip.dataset.city || '';
       if (filterCidade) filterCidade.value = activeCityChip ? chip.textContent.trim() : '';
       applyFilter();
+      if (categoryRows) applyCategoryRowFilter();
     });
   });
 
@@ -232,6 +236,210 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  /* ─── Category tabs + product row carousels ─── */
+  const categoryTabs = document.querySelectorAll('.category-tab');
+  const categoryRows = document.getElementById('category-rows');
+  const allSection   = document.querySelector('.product-section[data-section="all"]');
+  const dynamicRows  = document.getElementById('dynamic-category-rows');
+  const categoryEmpty = document.getElementById('category-empty');
+  let activeCategory = 'all';
+
+  // Keyword maps for auto-categorisation
+  const CATEGORY_MAP = {
+    graos:     { label: '🌾 Grãos',       keywords: ['soja','milho','trigo','arroz','feijão','sorgo','aveia','cevada','girassol','canola','grão','cereal'] },
+    hortalicas:{ label: '🥬 Hortaliças',  keywords: ['alface','couve','espinafre','cenoura','beterraba','cebola','alho','brócolis','repolho','pepino','tomate','abobrinha','pimentão','hortaliça','horta','vegetal','verdura'] },
+    frutas:    { label: '🍎 Frutas',       keywords: ['maçã','uva','laranja','banana','morango','melão','melancia','pêssego','ameixa','pera','kiwi','abacaxi','manga','mamão','fruta','limão','bergamota'] },
+    animais:   { label: '🐄 Animais',      keywords: ['boi','vaca','porco','frango','galinha','ovelha','cabra','peixe','ave','gado','suíno','bovino','equino','animal'] },
+    derivados: { label: '🥛 Derivados',    keywords: ['leite','queijo','mel','ovo','manteiga','nata','iogurte','creme','banha','linguiça','salame','embutido','derivado','laticínio'] },
+  };
+
+  function detectCategory(title, desc) {
+    const text = (title + ' ' + (desc || '')).toLowerCase();
+    for (const [key, cfg] of Object.entries(CATEGORY_MAP)) {
+      if (cfg.keywords.some(kw => text.includes(kw))) return key;
+    }
+    return 'outros';
+  }
+
+  function buildProductRowHTML(cards, rowId) {
+    if (!dynamicRows) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'product-row-wrap';
+    const prev = document.createElement('button');
+    prev.className = 'product-row-prev hidden';
+    prev.setAttribute('aria-label', 'Anterior');
+    prev.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>';
+    const row = document.createElement('div');
+    row.className = 'product-row';
+    row.id = 'row-' + rowId;
+    const next = document.createElement('button');
+    next.className = 'product-row-next';
+    next.setAttribute('aria-label', 'Próximo');
+    next.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>';
+    cards.forEach(c => row.appendChild(c.cloneNode(true)));
+    wrap.appendChild(prev);
+    wrap.appendChild(row);
+    wrap.appendChild(next);
+    initRowScroll(wrap);
+    return wrap;
+  }
+
+  function initRowScroll(wrap) {
+    const row  = wrap.querySelector('.product-row');
+    const prev = wrap.querySelector('.product-row-prev');
+    const next = wrap.querySelector('.product-row-next');
+    if (!row) return;
+    function updateBtns() {
+      if (!prev || !next) return;
+      prev.classList.toggle('hidden', row.scrollLeft <= 4);
+      next.classList.toggle('hidden', row.scrollLeft + row.clientWidth >= row.scrollWidth - 4);
+    }
+    if (prev) prev.addEventListener('click', () => { row.scrollBy({ left: -300, behavior: 'smooth' }); setTimeout(updateBtns, 350); });
+    if (next) next.addEventListener('click', () => { row.scrollBy({ left:  300, behavior: 'smooth' }); setTimeout(updateBtns, 350); });
+    row.addEventListener('scroll', updateBtns, { passive: true });
+    updateBtns();
+  }
+
+  function buildSectionHeader(label, count) {
+    return `
+      <div class="product-section-title">
+        ${label}
+        <span class="product-section-count">${count}</span>
+      </div>
+      <button type="button" class="product-section-see-all">Ver mais</button>`;
+  }
+
+  // Build dynamic category sections from products already in #row-all
+  function buildCategoryRows() {
+    if (!dynamicRows) return;
+    dynamicRows.innerHTML = '';
+    const allCards = productGrid ? [...productGrid.querySelectorAll('.product-card')] : [...productCards];
+    const allRow = document.getElementById('row-all');
+    const grouped = {};
+
+    if (allRow) {
+      allRow.innerHTML = '';
+      allCards.forEach(card => allRow.appendChild(card.cloneNode(true)));
+    }
+
+    allCards.forEach(card => {
+      const cat = detectCategory(card.dataset.title || '', card.dataset.desc || '');
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(card);
+    });
+
+    for (const [catKey, cfg] of Object.entries(CATEGORY_MAP)) {
+      const cards = grouped[catKey];
+      if (!cards || cards.length === 0) continue;
+      const section = document.createElement('div');
+      section.className = 'product-section';
+      section.dataset.section = catKey;
+
+      const header = document.createElement('div');
+      header.className = 'product-section-header';
+      header.innerHTML = buildSectionHeader(cfg.label, cards.length);
+      const rowWrap = buildProductRowHTML(cards, catKey);
+
+      section.appendChild(header);
+      section.appendChild(rowWrap);
+      const seeAll = header.querySelector('.product-section-see-all');
+      const row = rowWrap ? rowWrap.querySelector('.product-row') : null;
+      if (seeAll && row) {
+        seeAll.addEventListener('click', () => {
+          row.scrollBy({ left: row.clientWidth * 0.9, behavior: 'smooth' });
+        });
+      }
+      dynamicRows.appendChild(section);
+    }
+
+    // "outros" section
+    const outros = grouped['outros'];
+    if (outros && outros.length > 0) {
+      const section = document.createElement('div');
+      section.className = 'product-section';
+      section.dataset.section = 'outros';
+      const header = document.createElement('div');
+      header.className = 'product-section-header';
+      header.innerHTML = buildSectionHeader('📦 Outros', outros.length);
+      const rowWrap = buildProductRowHTML(outros, 'outros');
+      section.appendChild(header);
+      section.appendChild(rowWrap);
+      const seeAll = header.querySelector('.product-section-see-all');
+      const row = rowWrap ? rowWrap.querySelector('.product-row') : null;
+      if (seeAll && row) {
+        seeAll.addEventListener('click', () => {
+          row.scrollBy({ left: row.clientWidth * 0.9, behavior: 'smooth' });
+        });
+      }
+      dynamicRows.appendChild(section);
+    }
+  }
+
+  // Filter category rows by active tab
+  function filterCategoryRows(activeKey) {
+    activeCategory = activeKey || 'all';
+    applyCategoryRowFilter();
+  }
+
+  // Apply text/city filter to category row cards
+  function applyCategoryRowFilter() {
+    const q      = filterQ      ? filterQ.value.toLowerCase().trim()      : '';
+    const cidade = filterCidade ? filterCidade.value.toLowerCase().trim() : '';
+    const chip   = activeCityChip;
+
+    const allCards = document.querySelectorAll('#category-rows .product-card');
+    allCards.forEach(card => {
+      const title    = card.dataset.title    || '';
+      const desc     = card.dataset.desc     || '';
+      const producer = card.dataset.producer || '';
+      const city     = card.dataset.city     || '';
+      const matchQ      = !q      || title.includes(q) || desc.includes(q) || producer.includes(q);
+      const matchCidade = !cidade || city.includes(cidade);
+      const matchChip   = !chip   || city.includes(chip);
+      card.classList.toggle('is-row-hidden', !(matchQ && matchCidade && matchChip));
+    });
+
+    const sections = document.querySelectorAll('.product-section:not(.product-section--source)');
+    let anyVisibleSection = false;
+    sections.forEach(sec => {
+      const visible = sec.querySelectorAll('.product-card:not(.is-row-hidden)').length;
+      const countEl = sec.querySelector('.product-section-count');
+      if (countEl) countEl.textContent = visible;
+
+      const showByTab = activeCategory === 'all' || sec.dataset.section === activeCategory;
+      const show = showByTab && visible > 0;
+      sec.style.display = show ? '' : 'none';
+      if (show) anyVisibleSection = true;
+    });
+
+    if (categoryEmpty) categoryEmpty.style.display = anyVisibleSection ? 'none' : '';
+
+    const allVisible = document.querySelectorAll('#row-all .product-card:not(.is-row-hidden)').length;
+    if (marketCountNum) marketCountNum.textContent = allVisible;
+  }
+
+  // Init
+  if (categoryRows && allSection) {
+    buildCategoryRows();
+    applyCategoryRowFilter();
+
+    // Category tab clicks
+    categoryTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        categoryTabs.forEach(t => t.classList.remove('is-active'));
+        tab.classList.add('is-active');
+        filterCategoryRows(tab.dataset.category);
+      });
+    });
+
+    if (marketSort) {
+      marketSort.addEventListener('change', () => {
+        buildCategoryRows();
+        applyCategoryRowFilter();
+      });
+    }
+  }
 
   /* ─── Carrosséis ─── */
   document.querySelectorAll('.hero-carousel').forEach(carousel => {

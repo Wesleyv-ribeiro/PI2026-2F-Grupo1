@@ -351,6 +351,25 @@ def create_app():
     @app.route("/")
     def index():
         db = get_db()
+        featured_products = db.execute(
+            """
+            SELECT
+                p.id,
+                p.producer_id,
+                p.title,
+                p.description,
+                p.price,
+                p.created_at,
+                p.image_path,
+                p.is_featured,
+                u.name AS producer_name, u.city
+            FROM products p
+            JOIN users u ON p.producer_id = u.id
+            WHERE p.is_featured = 1
+            ORDER BY p.created_at DESC
+            LIMIT 12
+            """
+        ).fetchall()
         products = db.execute(
             """
             SELECT
@@ -361,7 +380,8 @@ def create_app():
                 p.price,
                 p.created_at,
                 p.image_path,
-                   u.name AS producer_name, u.city
+                p.is_featured,
+                u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
             ORDER BY p.created_at DESC
@@ -377,7 +397,12 @@ def create_app():
             LIMIT 6
             """
         ).fetchall()
-        return render_template("index.html", products=products, vets=vets)
+        return render_template(
+            "index.html",
+            products=products,
+            featured_products=featured_products,
+            vets=vets,
+        )
 
     @app.route("/register", methods=["GET", "POST"])
     def register():
@@ -635,7 +660,8 @@ def create_app():
                 p.price,
                 p.created_at,
                 p.image_path,
-                   u.name AS producer_name, u.city
+                p.is_featured,
+                u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
             ORDER BY p.created_at DESC
@@ -845,7 +871,7 @@ def create_app():
         ).fetchall()
         products = db.execute(
             """
-            SELECT p.id, p.title, p.price, u.name AS producer_name, u.city
+            SELECT p.id, p.title, p.price, p.is_featured, u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
             ORDER BY p.id DESC
@@ -942,6 +968,30 @@ def create_app():
         db.commit()
 
         flash("Status de verificação atualizado.", "success")
+        return redirect(url_for("admin_dashboard"))
+
+    @app.route("/admin/product/<int:product_id>/featured/toggle", methods=["POST"])
+    def toggle_product_featured(product_id):
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        product = db.execute(
+            "SELECT id, is_featured FROM products WHERE id = ?", (product_id,)
+        ).fetchone()
+        if product is None:
+            flash("Produto nÃ£o encontrado.", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        new_status = 0 if product["is_featured"] else 1
+        db.execute(
+            "UPDATE products SET is_featured = ? WHERE id = ?",
+            (new_status, product_id),
+        )
+        db.commit()
+
+        flash("Destaque do produto atualizado.", "success")
         return redirect(url_for("admin_dashboard"))
 
     @app.route("/servicos")
@@ -1143,7 +1193,8 @@ def init_db():
             description TEXT NOT NULL,
             price TEXT,
             created_at TIMESTAMP NOT NULL,
-            image_path TEXT
+            image_path TEXT,
+            is_featured INTEGER NOT NULL DEFAULT 0
         )
         """
     )
@@ -1204,6 +1255,9 @@ def init_db():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin INTEGER NOT NULL DEFAULT 0"
     )
     db.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS image_path TEXT")
+    db.execute(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured INTEGER NOT NULL DEFAULT 0"
+    )
 
     db.commit()
     db.close()
