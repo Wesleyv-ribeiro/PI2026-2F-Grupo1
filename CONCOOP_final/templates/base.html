@@ -134,6 +134,44 @@
   </div>
 </footer>
 
+{% if g.user %}
+<div class="modal-overlay" id="report-modal-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+    <div class="modal-header">
+      <h3 id="report-modal-title">Denunciar conteúdo</h3>
+      <button type="button" class="modal-close" id="report-modal-close" aria-label="Fechar">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="modal-target">Você está denunciando: <strong id="report-modal-label"></strong></p>
+    <form method="post" action="{{ url_for('report_content') }}" class="form-grid" id="report-modal-form">
+      <input type="hidden" name="target_type" id="report-modal-type">
+      <input type="hidden" name="target_id" id="report-modal-id">
+      <div class="form-field">
+        <label for="report-modal-reason">Motivo</label>
+        <select name="reason" id="report-modal-reason" required>
+          <option value="">Selecione um motivo...</option>
+          <option value="Conteúdo inadequado">Conteúdo inadequado</option>
+          <option value="Informação falsa ou enganosa">Informação falsa ou enganosa</option>
+          <option value="Golpe ou fraude">Golpe ou fraude</option>
+          <option value="Spam ou propaganda">Spam ou propaganda</option>
+          <option value="Comportamento abusivo">Comportamento abusivo</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="report-modal-details">Detalhes <span style="font-weight:400;text-transform:none;color:var(--muted);">(opcional)</span></label>
+        <textarea name="details" id="report-modal-details" rows="3" placeholder="Conte mais sobre o que está acontecendo..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline btn-sm" id="report-modal-cancel">Cancelar</button>
+        <button type="submit" class="btn btn-danger btn-sm">Enviar denúncia</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>

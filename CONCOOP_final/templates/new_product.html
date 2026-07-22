@@ -30,6 +30,14 @@
             <input type="text" id="price" name="price" placeholder="Ex: 35,00">
           </div>
           <div class="form-field">
+            <label for="stock">Estoque disponivel</label>
+            <input type="number" id="stock" name="stock" min="0" step="1" value="1" required>
+            <label class="made-to-order-option">
+              <input type="checkbox" id="made_to_order" name="made_to_order" value="1">
+              Produto feito na hora
+            </label>
+          </div>
+          <div class="form-field">
             <label for="product_image">Foto do produto <span style="font-weight:400;text-transform:none;color:var(--muted);">opcional</span></label>
             <input type="file" id="product_image" name="product_image" accept="image/*">
           </div>
@@ -71,6 +79,13 @@
       wrap.style.display = 'block';
     };
     reader.readAsDataURL(file);
+  });
+
+  const stockInput = document.getElementById('stock');
+  const madeToOrder = document.getElementById('made_to_order');
+  madeToOrder.addEventListener('change', () => {
+    stockInput.disabled = madeToOrder.checked;
+    stockInput.required = !madeToOrder.checked;
   });
 </script>
 {% endblock %}

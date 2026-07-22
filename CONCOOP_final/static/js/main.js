@@ -226,6 +226,60 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  /* ─── Modal de denúncia ─── */
+  const reportOverlay = document.getElementById('report-modal-overlay');
+  if (reportOverlay) {
+    const reportForm    = document.getElementById('report-modal-form');
+    const reportType    = document.getElementById('report-modal-type');
+    const reportId      = document.getElementById('report-modal-id');
+    const reportLabel   = document.getElementById('report-modal-label');
+    const reportReason  = document.getElementById('report-modal-reason');
+    const reportDetails = document.getElementById('report-modal-details');
+    const reportClose   = document.getElementById('report-modal-close');
+    const reportCancel  = document.getElementById('report-modal-cancel');
+
+    const openReportModal = (type, id, label) => {
+      reportType.value = type || '';
+      reportId.value = id || '';
+      reportLabel.textContent = label || '';
+      reportReason.value = '';
+      reportDetails.value = '';
+      reportOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    };
+
+    const closeReportModal = () => {
+      reportOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+    };
+
+    document.querySelectorAll('[data-report-trigger]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        openReportModal(btn.dataset.reportType, btn.dataset.reportId, btn.dataset.reportLabel);
+      });
+    });
+
+    if (reportClose)  reportClose.addEventListener('click', closeReportModal);
+    if (reportCancel) reportCancel.addEventListener('click', closeReportModal);
+
+    reportOverlay.addEventListener('click', (e) => {
+      if (e.target === reportOverlay) closeReportModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && reportOverlay.classList.contains('open')) closeReportModal();
+    });
+
+    if (reportForm) {
+      reportForm.addEventListener('submit', (e) => {
+        if (!reportReason.value) {
+          e.preventDefault();
+          reportReason.focus();
+        }
+      });
+    }
+  }
+
   /* ─── Scroll suave para âncoras ─── */
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', (e) => {

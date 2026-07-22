@@ -54,6 +54,9 @@
                     {% if r.species %}
                       <span class="card-tag tag-green" style="margin-bottom:0;">{{ r.species }}</span>
                     {% endif %}
+                    {% if r.report_count and r.report_count > 0 %}
+                      <span class="badge badge-red">Denunciado ({{ r.report_count }})</span>
+                    {% endif %}
                   </div>
                   <h3 class="card-title" style="font-size:1rem;margin-bottom:0.4rem;">{{ r.title }}</h3>
                   <p class="card-desc">{{ r.description | truncate(180) }}</p>
@@ -63,9 +66,20 @@
                     <span> {{ r.created_at.strftime('%d/%m/%Y') if r.created_at else '' }}</span>
                   </div>
                 </div>
-                <a href="{{ url_for('vets') }}" class="btn btn-primary btn-sm" style="flex-shrink:0;">
-                  Consultar Vet
-                </a>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;flex-shrink:0;">
+                  <a href="{{ url_for('vets') }}" class="btn btn-primary btn-sm">
+                    Consultar Vet
+                  </a>
+                  {% if g.user and g.user.id != r.author_id %}
+                    <button type="button" class="btn btn-ghost btn-sm"
+                            data-report-trigger
+                            data-report-type="animal_report"
+                            data-report-id="{{ r.id }}"
+                            data-report-label="{{ r.title }}">
+                      Denunciar
+                    </button>
+                  {% endif %}
+                </div>
               </div>
             </article>
           {% endfor %}

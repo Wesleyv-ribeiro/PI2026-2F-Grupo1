@@ -26,6 +26,11 @@
 
   <div class="product-card-body">
     <span class="card-tag tag-green product-card-tag">Produto Rural</span>
+    {% if p.made_to_order %}
+      <span class="card-tag tag-brown product-card-tag">Feito na hora</span>
+    {% else %}
+      <span class="product-stock-label">{{ p.stock }} em estoque</span>
+    {% endif %}
     <h3 class="product-card-title">
       <a href="{{ url_for('profile', user_id=p.producer_id) }}">{{ p.title }}</a>
     </h3>
@@ -53,6 +58,22 @@
           <a href="{{ url_for('chat', user_id=p.producer_id, product_id=p.id) }}" class="btn btn-primary btn-sm">{{ chat_label }}</a>
         {% endif %}
       </div>
+      <div class="product-card-report">
+        {% if g.user and g.user.id != p.producer_id %}
+          <button type="button" class="btn btn-ghost btn-sm"
+                  data-report-trigger
+                  data-report-type="product"
+                  data-report-id="{{ p.id }}"
+                  data-report-label="{{ p.title }}">
+            Denunciar
+          </button>
+        {% endif %}
+      </div>
+      {% if p.report_count and p.report_count > 0 %}
+        <div style="margin-top:0.5rem;">
+          <span class="badge badge-red">Denunciado ({{ p.report_count }})</span>
+        </div>
+      {% endif %}
     </div>
   </div>
 </article>

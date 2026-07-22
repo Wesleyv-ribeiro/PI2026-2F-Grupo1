@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Denúncias — Admin{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top:2rem;padding-bottom:4rem;">
+  <div class="page-header">
+    <h1>Denúncias</h1>
+    <p>Analise o conteúdo denunciado pela comunidade e tome as ações necessárias.</p>
+  </div>
+
+  <div class="card" style="padding:0;">
+    {% if reports %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Denunciante</th>
+              <th>Tipo</th>
+              <th>Alvo</th>
+              <th>Motivo</th>
+              <th>Detalhes</th>
+              <th>Criada em</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in reports %}
+              <tr>
+                <td style="color:var(--muted);font-size:0.78rem;">{{ r.id }}</td>
+                <td><strong>{{ r.reporter_name }}</strong></td>
+                <td>
+                  <span class="badge
+                    {% if r.target_type == 'product' %}badge-green
+                    {% elif r.target_type == 'service' %}badge-gold
+                    {% elif r.target_type == 'animal_report' %}badge-blue
+                    {% else %}badge-red{% endif %}">
+                    {% if r.target_type == 'product' %}Produto
+                    {% elif r.target_type == 'service' %}Serviço
+                    {% elif r.target_type == 'animal_report' %}Relato
+                    {% else %}Usuário{% endif %}
+                  </span>
+                </td>
+                <td style="max-width:220px;">
+                  {% if r.target_type == 'product' %}
+                    {% if r.product_title %}
+                      <a href="{{ url_for('profile', user_id=r.product_producer) }}">{{ r.product_title }}</a>
+                    {% else %}<em style="color:var(--muted);">(excluído)</em>{% endif %}
+                  {% elif r.target_type == 'service' %}
+                    {% if r.service_title %}
+                      <a href="{{ url_for('profile', user_id=r.service_provider) }}">{{ r.service_title }}</a>
+                    {% else %}<em style="color:var(--muted);">(excluído)</em>{% endif %}
+                  {% elif r.target_type == 'animal_report' %}
+                    {% if r.animal_report_title %}
+                      <a href="{{ url_for('profile', user_id=r.animal_report_author) }}">{{ r.animal_report_title }}</a>
+                    {% else %}<em style="color:var(--muted);">(excluído)</em>{% endif %}
+                  {% else %}
+                    {% if r.reported_user_name %}
+                      <a href="{{ url_for('profile', user_id=r.target_id) }}">{{ r.reported_user_name }}</a>
+                      {% if not r.reported_user_active %}<span class="badge badge-red" style="margin-left:0.4rem;">Suspenso</span>{% endif %}
+                    {% else %}<em style="color:var(--muted);">(excluído)</em>{% endif %}
+                  {% endif %}
+                </td>
+                <td>{{ r.reason }}</td>
+                <td style="max-width:220px;">{{ r.details or "—" }}</td>
+                <td style="color:var(--muted);font-size:0.82rem;">{{ r.created_at }}</td>
+                <td>
+                  {% if r.is_resolved %}
+                    <span class="badge badge-green">Resolvida</span>
+                  {% else %}
+                    <span class="badge badge-gold">Pendente</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div style="display:flex;flex-direction:column;gap:0.4rem;min-width:150px;">
+                    {% if not r.is_resolved %}
+                      <form method="post" action="{{ url_for('resolve_report', report_id=r.id) }}">
+                        <button class="btn btn-outline btn-sm btn-full">Marcar resolvida</button>
+                      </form>
+                    {% endif %}
+
+                    {% if r.target_type == 'product' and r.product_title %}
+                      <form method="post" action="{{ url_for('admin_delete_product', product_id=r.target_id) }}"
+                            data-confirm="Confirmar exclusão do produto?">
+                        <button class="btn btn-danger btn-sm btn-full">Excluir produto</button>
+                      </form>
+                    {% elif r.target_type == 'service' and r.service_title %}
+                      <form method="post" action="{{ url_for('admin_delete_service', service_id=r.target_id) }}"
+                            data-confirm="Confirmar exclusão do serviço?">
+                        <button class="btn btn-danger btn-sm btn-full">Excluir serviço</button>
+                      </form>
+                    {% elif r.target_type == 'animal_report' and r.animal_report_title %}
+                      <form method="post" action="{{ url_for('admin_delete_animal_report', animal_report_id=r.target_id) }}"
+                            data-confirm="Confirmar exclusão do relato?">
+                        <button class="btn btn-danger btn-sm btn-full">Excluir relato</button>
+                      </form>
+                    {% elif r.target_type == 'user' and r.reported_user_name and not r.reported_user_is_admin %}
+                      <form method="post" action="{{ url_for('admin_toggle_user_active', user_id=r.target_id) }}"
+                            data-confirm="{% if not r.reported_user_active %}Reativar esta conta?{% else %}Suspender esta conta?{% endif %}">
+                        <button class="btn {% if not r.reported_user_active %}btn-outline{% else %}btn-danger{% endif %} btn-sm btn-full">
+                          {% if not r.reported_user_active %}Reativar conta{% else %}Suspender conta{% endif %}
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty" style="padding:3rem;">
+        <p>Nenhuma denúncia encontrada.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

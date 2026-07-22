@@ -38,6 +38,15 @@
         <div class="admin-stat-lbl">Mensagens</div>
       </div>
     </div>
+    <a href="{{ url_for('admin_reports') }}" class="admin-stat">
+      <div class="admin-stat-icon red">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+      </div>
+      <div>
+        <div class="admin-stat-num">{{ pending_reports }}</div>
+        <div class="admin-stat-lbl">Denúncias pendentes</div>
+      </div>
+    </a>
   </div>
 
   <!-- BROADCAST -->
@@ -74,7 +83,7 @@
           <thead>
             <tr>
               <th>ID</th><th>Nome</th><th>E-mail</th><th>Tipo</th>
-              <th>Cidade</th><th>CRMV</th><th>Verificado</th><th>Admin</th><th>Ações</th>
+              <th>Cidade</th><th>CRMV</th><th>Verificado</th><th>Admin</th><th>Status</th><th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -108,13 +117,31 @@
                 {% else %}<span style="color:var(--muted);font-size:0.82rem;">Não</span>{% endif %}
               </td>
               <td>
-                {% if u.role == 'veterinario' %}
-                  <form method="post" action="{{ url_for('toggle_vet_verification', user_id=u.id) }}" style="display:inline;">
-                    <button type="submit" class="btn btn-sm {% if u.is_vet_verified %}btn-danger{% else %}btn-primary{% endif %}">
-                      {% if u.is_vet_verified %}Remover{% else %}Verificar{% endif %}
-                    </button>
-                  </form>
-                {% else %}—{% endif %}
+                {% if u.is_active %}
+                  <span class="badge badge-green">Ativo</span>
+                {% else %}
+                  <span class="badge badge-red">Suspenso</span>
+                {% endif %}
+              </td>
+              <td>
+                <div style="display:flex;flex-direction:column;gap:0.4rem;min-width:110px;">
+                  {% if u.role == 'veterinario' %}
+                    <form method="post" action="{{ url_for('toggle_vet_verification', user_id=u.id) }}">
+                      <button type="submit" class="btn btn-sm btn-full {% if u.is_vet_verified %}btn-danger{% else %}btn-primary{% endif %}">
+                        {% if u.is_vet_verified %}Remover{% else %}Verificar{% endif %}
+                      </button>
+                    </form>
+                  {% endif %}
+                  {% if not u.is_admin %}
+                    <form method="post" action="{{ url_for('admin_toggle_user_active', user_id=u.id) }}"
+                          data-confirm="{% if u.is_active %}Suspender esta conta?{% else %}Reativar esta conta?{% endif %}">
+                      <button type="submit" class="btn btn-sm btn-full {% if u.is_active %}btn-danger{% else %}btn-outline{% endif %}">
+                        {% if u.is_active %}Suspender{% else %}Reativar{% endif %}
+                      </button>
+                    </form>
+                  {% endif %}
+                  {% if u.role != 'veterinario' and u.is_admin %}—{% endif %}
+                </div>
               </td>
             </tr>
             {% endfor %}

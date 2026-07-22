@@ -83,7 +83,21 @@
             <div class="market-card-actions">
               <a href="{{ url_for('chat', user_id=s.provider_id) }}" class="btn btn-primary btn-sm">Contatar</a>
               <a href="{{ url_for('profile', user_id=s.provider_id) }}" class="btn btn-outline btn-sm">Perfil</a>
+              {% if g.user and g.user.id != s.provider_id %}
+                <button type="button" class="btn btn-ghost btn-sm"
+                        data-report-trigger
+                        data-report-type="service"
+                        data-report-id="{{ s.id }}"
+                        data-report-label="{{ s.title }}">
+                  Denunciar
+                </button>
+              {% endif %}
             </div>
+            {% if s.report_count and s.report_count > 0 %}
+              <div style="margin-top:0.5rem;">
+                <span class="badge badge-red">Denunciado ({{ s.report_count }})</span>
+              </div>
+            {% endif %}
           </div>
         </article>
       {% endfor %}

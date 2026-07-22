@@ -148,6 +148,17 @@ PROFILE_DIR = UPLOAD_BASE / "profiles"
 PRODUCT_DIR = UPLOAD_BASE / "products"
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 
+# Tipos de alvo e motivos aceitos pelo sistema de denúncias.
+REPORT_TARGET_TYPES = {"product", "service", "animal_report", "user"}
+ALLOWED_REPORT_REASONS = {
+    "Conteúdo inadequado",
+    "Informação falsa ou enganosa",
+    "Golpe ou fraude",
+    "Spam ou propaganda",
+    "Comportamento abusivo",
+    "Outro",
+}
+
 
 def ensure_upload_dirs():
     """Garante que as pastas de upload existam."""
@@ -299,6 +310,41 @@ def validar_crmv_offline(texto: str):
     }
 
 
+def get_report_target_owner(db, target_type, target_id):
+    """
+    Verifica se o alvo de uma denúncia existe e retorna o id do usuário
+    responsável por ele: produtor (product), prestador (service), autor
+    do relato (animal_report) ou o próprio usuário (user).
+
+    Retorna uma tupla (existe: bool, owner_id: int | None).
+    """
+    if target_type == "product":
+        row = db.execute(
+            "SELECT producer_id FROM products WHERE id = ?", (target_id,)
+        ).fetchone()
+        return (row is not None, row["producer_id"] if row else None)
+
+    if target_type == "service":
+        row = db.execute(
+            "SELECT provider_id FROM services WHERE id = ?", (target_id,)
+        ).fetchone()
+        return (row is not None, row["provider_id"] if row else None)
+
+    if target_type == "animal_report":
+        row = db.execute(
+            "SELECT user_id FROM animal_reports WHERE id = ?", (target_id,)
+        ).fetchone()
+        return (row is not None, row["user_id"] if row else None)
+
+    if target_type == "user":
+        row = db.execute(
+            "SELECT id FROM users WHERE id = ?", (target_id,)
+        ).fetchone()
+        return (row is not None, row["id"] if row else None)
+
+    return (False, None)
+
+
 def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "change-this-secret-key"
@@ -324,12 +370,17 @@ def create_app():
                     crmv,
                     is_vet_verified,
                     profile_image,
-                    is_admin
+                    is_admin,
+                    is_active
                 FROM users
                 WHERE id = ?
                 """,
                 (user_id,),
             ).fetchone()
+            if g.user is not None and not g.user["is_active"]:
+                session.clear()
+                g.user = None
+                flash("Sua conta foi suspensa. Entre em contato com a administração.", "error")
             if g.user is not None:
                 g.unread_count = (
                     db.execute(
@@ -359,13 +410,15 @@ def create_app():
                 p.title,
                 p.description,
                 p.price,
+                p.stock,
+                p.made_to_order,
                 p.created_at,
                 p.image_path,
                 p.is_featured,
                 u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
-            WHERE p.is_featured = 1
+            WHERE p.is_featured = 1 AND (p.stock > 0 OR p.made_to_order = 1)
             ORDER BY p.created_at DESC
             LIMIT 12
             """
@@ -378,12 +431,15 @@ def create_app():
                 p.title,
                 p.description,
                 p.price,
+                p.stock,
+                p.made_to_order,
                 p.created_at,
                 p.image_path,
                 p.is_featured,
                 u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
+            WHERE p.stock > 0 OR p.made_to_order = 1
             ORDER BY p.created_at DESC
             LIMIT 20
             """
@@ -496,6 +552,8 @@ def create_app():
             error = None
             if user is None or not check_password_hash(user["password_hash"], password):
                 error = "E-mail ou senha inválidos."
+            elif not user["is_active"]:
+                error = "Esta conta foi suspensa. Entre em contato com a administração."
 
             if error is None:
                 session.clear()
@@ -535,7 +593,7 @@ def create_app():
         if g.user["role"] == "produtor":
             products = db.execute(
                 """
-                SELECT id, title, description, price, created_at, image_path
+                SELECT id, title, description, price, stock, made_to_order, created_at, image_path
                 FROM products
                 WHERE producer_id = ?
                 ORDER BY created_at DESC
@@ -605,11 +663,16 @@ def create_app():
             title = request.form["title"].strip()
             description = request.form["description"].strip()
             price = request.form.get("price", "").strip()
+            stock_value = request.form.get("stock", "").strip()
+            made_to_order = 1 if request.form.get("made_to_order") else 0
             product_file = request.files.get("product_image")
 
             if not title or not description:
                 flash("Título e descrição são obrigatórios.", "error")
+            elif not made_to_order and not stock_value.isdigit():
+                flash("Informe uma quantidade de estoque valida (zero ou maior).", "error")
             else:
+                stock = 0 if made_to_order else int(stock_value)
                 db = get_db()
                 image_path = None
                 if product_file and product_file.filename:
@@ -627,16 +690,20 @@ def create_app():
                         title,
                         description,
                         price,
+                        stock,
+                        made_to_order,
                         created_at,
                         image_path
                     )
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         g.user["id"],
                         title,
                         description,
                         price or None,
+                        stock,
+                        made_to_order,
                         datetime.utcnow(),
                         image_path,
                     ),
@@ -646,6 +713,45 @@ def create_app():
                 return redirect(url_for("dashboard"))
 
         return render_template("new_product.html")
+
+    @app.route("/products/<int:product_id>/stock", methods=["POST"])
+    def update_product_stock(product_id):
+        """Permite que apenas o produtor altere o estoque do seu produto."""
+        if g.user is None or g.user["role"] != "produtor":
+            flash("Apenas produtores podem alterar o estoque.", "error")
+            return redirect(url_for("login"))
+
+        db = get_db()
+        product = db.execute(
+            "SELECT id, stock, made_to_order FROM products WHERE id = ? AND producer_id = ?",
+            (product_id, g.user["id"]),
+        ).fetchone()
+        if product is None:
+            flash("Produto nao encontrado.", "error")
+            return redirect(url_for("dashboard"))
+        if product["made_to_order"]:
+            flash("Produtos feitos na hora nao usam controle de estoque.", "info")
+            return redirect(url_for("dashboard"))
+
+        operation = request.form.get("operation", "set")
+        if operation == "increase":
+            new_stock = product["stock"] + 1
+        elif operation == "decrease":
+            new_stock = max(product["stock"] - 1, 0)
+        else:
+            stock_value = request.form.get("stock", "").strip()
+            if not stock_value.isdigit():
+                flash("Informe uma quantidade de estoque valida (zero ou maior).", "error")
+                return redirect(url_for("dashboard"))
+            new_stock = int(stock_value)
+
+        db.execute("UPDATE products SET stock = ? WHERE id = ?", (new_stock, product_id))
+        db.commit()
+        if new_stock == 0:
+            flash("Estoque atualizado: produto marcado como Sem estoque e oculto do Mercado.", "info")
+        else:
+            flash(f"Estoque atualizado: {new_stock} unidade(s) disponivel(is).", "success")
+        return redirect(url_for("dashboard"))
 
     @app.route("/marketplace")
     def marketplace():
@@ -658,12 +764,18 @@ def create_app():
                 p.title,
                 p.description,
                 p.price,
+                p.stock,
+                p.made_to_order,
                 p.created_at,
                 p.image_path,
+                                (
+                                    SELECT COUNT(*) FROM reports rep WHERE rep.target_type = 'product' AND rep.target_id = p.id AND rep.is_resolved = 0
+                                ) AS report_count,
                 p.is_featured,
                 u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
+            WHERE p.stock > 0 OR p.made_to_order = 1
             ORDER BY p.created_at DESC
             """
         ).fetchall()
@@ -672,6 +784,189 @@ def create_app():
             key=str.casefold,
         )
         return render_template("marketplace.html", products=products, cities=cities)
+
+    @app.route("/report", methods=["POST"])
+    def report_content():
+        redirect_url = request.referrer or url_for("marketplace")
+
+        if g.user is None:
+            flash("Faça login para denunciar conteúdo.", "error")
+            return redirect(url_for("login"))
+
+        target_type = request.form.get("target_type", "").strip()
+        target_id = request.form.get("target_id", type=int)
+        reason = request.form.get("reason", "").strip()
+        details = request.form.get("details", "").strip()
+
+        if target_type not in REPORT_TARGET_TYPES:
+            flash("Tipo de denúncia inválido.", "error")
+            return redirect(redirect_url)
+
+        if not target_id or reason not in ALLOWED_REPORT_REASONS:
+            flash("Selecione um motivo válido para a denúncia.", "error")
+            return redirect(redirect_url)
+
+        db = get_db()
+        exists, owner_id = get_report_target_owner(db, target_type, target_id)
+
+        if not exists:
+            flash("Não foi possível localizar o conteúdo denunciado.", "error")
+            return redirect(redirect_url)
+
+        if owner_id == g.user["id"]:
+            flash("Você não pode denunciar seu próprio conteúdo.", "error")
+            return redirect(redirect_url)
+
+        duplicate = db.execute(
+            """
+            SELECT id FROM reports
+            WHERE reporter_id = ? AND target_type = ? AND target_id = ? AND is_resolved = 0
+            """,
+            (g.user["id"], target_type, target_id),
+        ).fetchone()
+        if duplicate:
+            flash("Você já denunciou este conteúdo. Nossa equipe está analisando.", "info")
+            return redirect(redirect_url)
+
+        db.execute(
+            """
+            INSERT INTO reports (reporter_id, target_type, target_id, reason, details, created_at, is_resolved)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+            """,
+            (g.user["id"], target_type, target_id, reason, details or None, datetime.utcnow()),
+        )
+        db.commit()
+
+        flash("Denúncia enviada com sucesso. Obrigado por ajudar a manter a comunidade segura.", "success")
+        return redirect(redirect_url)
+
+    @app.route("/admin/reports")
+    def admin_reports():
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        reports = db.execute(
+            """
+            SELECT
+                r.id, r.reporter_id, r.target_type, r.target_id,
+                r.reason, r.details, r.created_at, r.is_resolved,
+                u.name AS reporter_name,
+                p.title AS product_title, p.producer_id AS product_producer,
+                s.title AS service_title, s.provider_id AS service_provider,
+                ar.title AS animal_report_title, ar.user_id AS animal_report_author,
+                ru.name AS reported_user_name, ru.is_active AS reported_user_active,
+                ru.is_admin AS reported_user_is_admin
+            FROM reports r
+            JOIN users u ON u.id = r.reporter_id
+            LEFT JOIN products p        ON p.id  = r.target_id AND r.target_type = 'product'
+            LEFT JOIN services s        ON s.id  = r.target_id AND r.target_type = 'service'
+            LEFT JOIN animal_reports ar ON ar.id  = r.target_id AND r.target_type = 'animal_report'
+            LEFT JOIN users ru          ON ru.id  = r.target_id AND r.target_type = 'user'
+            ORDER BY r.is_resolved ASC, r.created_at DESC
+            """
+        ).fetchall()
+        return render_template("admin_reports.html", reports=reports)
+
+    @app.route("/admin/reports/<int:report_id>/resolve", methods=["POST"])
+    def resolve_report(report_id):
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        db.execute(
+            "UPDATE reports SET is_resolved = 1 WHERE id = ?",
+            (report_id,),
+        )
+        db.commit()
+        flash("Denúncia marcada como resolvida.", "success")
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/product/<int:product_id>/delete", methods=["POST"])
+    def admin_delete_product(product_id):
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        db.execute("DELETE FROM products WHERE id = ?", (product_id,))
+        db.execute(
+            "UPDATE reports SET is_resolved = 1 WHERE target_type = 'product' AND target_id = ?",
+            (product_id,),
+        )
+        db.commit()
+        flash("Produto excluído com sucesso.", "success")
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/service/<int:service_id>/delete", methods=["POST"])
+    def admin_delete_service(service_id):
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        db.execute("DELETE FROM services WHERE id = ?", (service_id,))
+        db.execute(
+            "UPDATE reports SET is_resolved = 1 WHERE target_type = 'service' AND target_id = ?",
+            (service_id,),
+        )
+        db.commit()
+        flash("Serviço excluído com sucesso.", "success")
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/animal-report/<int:animal_report_id>/delete", methods=["POST"])
+    def admin_delete_animal_report(animal_report_id):
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        db.execute("DELETE FROM animal_reports WHERE id = ?", (animal_report_id,))
+        db.execute(
+            "UPDATE reports SET is_resolved = 1 WHERE target_type = 'animal_report' AND target_id = ?",
+            (animal_report_id,),
+        )
+        db.commit()
+        flash("Relato excluído com sucesso.", "success")
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/user/<int:user_id>/suspend", methods=["POST"])
+    def admin_toggle_user_active(user_id):
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        if user_id == g.user["id"]:
+            flash("Você não pode suspender sua própria conta.", "error")
+            return redirect(url_for("admin_reports"))
+
+        db = get_db()
+        target = db.execute(
+            "SELECT id, is_active, is_admin FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if target is None:
+            flash("Usuário não encontrado.", "error")
+            return redirect(url_for("admin_reports"))
+        if target["is_admin"]:
+            flash("Não é possível suspender uma conta de administrador.", "error")
+            return redirect(url_for("admin_reports"))
+
+        new_status = 0 if target["is_active"] else 1
+        db.execute("UPDATE users SET is_active = ? WHERE id = ?", (new_status, user_id))
+        if new_status == 0:
+            db.execute(
+                "UPDATE reports SET is_resolved = 1 WHERE target_type = 'user' AND target_id = ?",
+                (user_id,),
+            )
+        db.commit()
+
+        flash(
+            "Conta suspensa com sucesso." if new_status == 0 else "Conta reativada com sucesso.",
+            "success",
+        )
+        return redirect(url_for("admin_reports"))
 
     @app.route("/vets")
     def vets():
@@ -864,7 +1159,7 @@ def create_app():
         db = get_db()
         users = db.execute(
             """
-            SELECT id, name, email, role, city, crmv, is_vet_verified, is_admin
+            SELECT id, name, email, role, city, crmv, is_vet_verified, is_admin, is_active
             FROM users
             ORDER BY id ASC
             """
@@ -892,12 +1187,15 @@ def create_app():
             ORDER BY m.created_at DESC
             """
         ).fetchall()
-
+        pending_reports = db.execute(
+            "SELECT COUNT(*) FROM reports WHERE is_resolved = 0"
+        ).fetchone()["count"]
         return render_template(
             "admin_dashboard.html",
             users=users,
             products=products,
             messages=messages,
+            pending_reports=pending_reports,
         )
 
     @app.route("/admin/broadcast", methods=["POST"])
@@ -1001,7 +1299,11 @@ def create_app():
             """
             SELECT s.id, s.title, s.description, s.category,
                    s.price, s.location, s.contact, s.created_at,
-                   u.name AS provider_name, u.id AS provider_id
+                   u.name AS provider_name, u.id AS provider_id,
+                   (
+                       SELECT COUNT(*) FROM reports rep
+                       WHERE rep.target_type = 'service' AND rep.target_id = s.id AND rep.is_resolved = 0
+                   ) AS report_count
             FROM services s
             JOIN users u ON u.id = s.provider_id
             ORDER BY s.created_at DESC
@@ -1050,7 +1352,12 @@ def create_app():
         relatos = db.execute(
             """
             SELECT r.id, r.title, r.description, r.species, r.urgency,
-                   r.location, r.status, r.created_at, u.name AS author_name
+                   r.location, r.status, r.created_at,
+                   u.name AS author_name, u.id AS author_id,
+                   (
+                       SELECT COUNT(*) FROM reports rep
+                       WHERE rep.target_type = 'animal_report' AND rep.target_id = r.id AND rep.is_resolved = 0
+                   ) AS report_count
             FROM animal_reports r
             JOIN users u ON u.id = r.user_id
             ORDER BY r.created_at DESC
@@ -1146,10 +1453,13 @@ def create_app():
         if user["role"] == "produtor":
             products = db.execute(
                 """
-                SELECT id, title, description, price, created_at, image_path
-                FROM products
-                WHERE producer_id = ?
-                ORDER BY created_at DESC
+                SELECT id, title, description, price, stock, made_to_order, created_at, image_path
+                                ,(
+                                    SELECT COUNT(*) FROM reports rep WHERE rep.target_type = 'product' AND rep.target_id = products.id AND rep.is_resolved = 0
+                                ) AS report_count
+                                FROM products
+                                WHERE producer_id = ?
+                                ORDER BY created_at DESC
                 """,
                 (user["id"],),
             ).fetchall()
@@ -1192,6 +1502,8 @@ def init_db():
             title TEXT NOT NULL,
             description TEXT NOT NULL,
             price TEXT,
+            stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+            made_to_order INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP NOT NULL,
             image_path TEXT,
             is_featured INTEGER NOT NULL DEFAULT 0
@@ -1243,6 +1555,21 @@ def init_db():
         """
     )
 
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reports (
+            id SERIAL PRIMARY KEY,
+            reporter_id INTEGER NOT NULL REFERENCES users (id),
+            target_type TEXT NOT NULL,
+            target_id INTEGER NOT NULL,
+            reason TEXT NOT NULL,
+            details TEXT,
+            created_at TIMESTAMP NOT NULL,
+            is_resolved INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+
     db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS crmv TEXT")
     db.execute(
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_vet_verified INTEGER NOT NULL DEFAULT 0"
@@ -1258,6 +1585,18 @@ def init_db():
     db.execute(
         "ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured INTEGER NOT NULL DEFAULT 0"
     )
+    # Produtos jÃ¡ cadastrados recebem uma unidade para continuarem visÃ­veis
+    # atÃ© que o produtor informe o estoque real no painel.
+    db.execute(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 1"
+    )
+    db.execute(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS made_to_order INTEGER NOT NULL DEFAULT 0"
+    )
+    db.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 1"
+    )
+
 
     db.commit()
     db.close()

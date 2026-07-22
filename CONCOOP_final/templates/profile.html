@@ -37,10 +37,17 @@
         {% endif %}
 
         {% if g.user and g.user.id != user.id %}
-          <div style="margin-top:1.25rem;">
+          <div style="margin-top:1.25rem;display:flex;gap:0.6rem;flex-wrap:wrap;">
             <a href="{{ url_for('chat', user_id=user.id) }}" class="btn btn-gold">
                Enviar mensagem
             </a>
+            <button type="button" class="btn btn-outline" style="border-color:rgba(255,255,255,.35);color:#fff;"
+                    data-report-trigger
+                    data-report-type="user"
+                    data-report-id="{{ user.id }}"
+                    data-report-label="{{ user.name }}">
+              Denunciar usuário
+            </button>
           </div>
         {% endif %}
       </div>
@@ -95,10 +102,20 @@
                 <img src="{{ url_for('static', filename=p.image_path) }}" alt="{{ p.title }}" class="card-image">
               {% endif %}
               <span class="card-tag tag-green">Produto</span>
+              {% if p.made_to_order %}
+                <span class="badge badge-brown">Feito na hora</span>
+              {% elif p.stock == 0 %}
+                <span class="badge badge-red">Sem estoque</span>
+              {% else %}
+                <p class="card-meta"><strong>{{ p.stock }}</strong> unidade{% if p.stock != 1 %}s{% endif %} disponivel{% if p.stock != 1 %}is{% endif %}</p>
+              {% endif %}
+              {% if p.report_count and p.report_count > 0 %}
+                <span class="badge badge-red">Denunciado ({{ p.report_count }})</span>
+              {% endif %}
               <h3 class="card-title">{{ p.title }}</h3>
               <p class="card-desc">{{ p.description|truncate(140) }}</p>
               {% if p.price %}<p class="price">R$ {{ p.price }}</p>{% endif %}
-              {% if g.user and g.user.id != user.id %}
+              {% if g.user and g.user.id != user.id and (p.stock > 0 or p.made_to_order) %}
                 <div class="card-actions">
                   <a href="{{ url_for('chat', user_id=user.id, product_id=p.id) }}" class="btn btn-primary btn-sm">Negociar</a>
                 </div>
