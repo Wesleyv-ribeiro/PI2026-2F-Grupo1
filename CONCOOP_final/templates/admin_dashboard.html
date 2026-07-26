@@ -47,7 +47,72 @@
         <div class="admin-stat-lbl">Denúncias pendentes</div>
       </div>
     </a>
+    <a href="#produtos-pendentes" class="admin-stat">
+      <div class="admin-stat-icon gold">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      </div>
+      <div>
+        <div class="admin-stat-num">{{ pending_products|length }}</div>
+        <div class="admin-stat-lbl">Produtos p/ verificar</div>
+      </div>
+    </a>
   </div>
+
+  <!-- PRODUTOS PENDENTES DE VERIFICAÇÃO (IA) -->
+  <section class="section" id="produtos-pendentes">
+    <div class="section-header">
+      <h2>Produtos Pendentes de Verificação</h2>
+      <span style="font-size:0.82rem;color:var(--muted);">
+        A verificação automática (IA) não teve certeza sobre estes produtos.
+      </span>
+    </div>
+    <div class="card" style="padding:0;">
+      {% if pending_products %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Produto</th><th>Produtor</th><th>Preço</th>
+              <th>Motivo da IA</th><th>Cadastrado em</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in pending_products %}
+            <tr>
+              <td style="color:var(--muted);font-size:0.78rem;">{{ p.id }}</td>
+              <td>
+                <strong>{{ p.title }}</strong>
+                <div style="color:var(--muted);font-size:0.78rem;max-width:260px;">{{ p.description|truncate(90) }}</div>
+              </td>
+              <td>
+                <a href="{{ url_for('profile', user_id=p.producer_id) }}">{{ p.producer_name }}</a>
+              </td>
+              <td>{% if p.price %}R$ {{ p.price }}{% else %}—{% endif %}</td>
+              <td style="max-width:260px;color:var(--muted);font-size:0.8rem;">{{ p.moderation_reason or "—" }}</td>
+              <td style="color:var(--muted);font-size:0.8rem;">{{ p.created_at }}</td>
+              <td>
+                <div style="display:flex;flex-direction:column;gap:0.4rem;min-width:130px;">
+                  <form method="post" action="{{ url_for('admin_approve_product', product_id=p.id) }}">
+                    <button type="submit" class="btn btn-sm btn-full btn-primary">Aprovar</button>
+                  </form>
+                  <form method="post" action="{{ url_for('admin_reject_product', product_id=p.id) }}"
+                        data-confirm="Rejeitar este produto? Ele não aparecerá no Mercado.">
+                    <button type="submit" class="btn btn-sm btn-full btn-danger">Rejeitar</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty" style="padding:1.5rem;">
+        <p>Nenhum produto aguardando revisão manual no momento.</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
 
   <!-- BROADCAST -->
   <section class="section">
@@ -158,7 +223,7 @@
       <div class="table-wrap">
         <table class="table">
           <thead>
-            <tr><th>ID</th><th>Título</th><th>Produtor</th><th>Cidade</th><th>Preço</th></tr>
+            <tr><th>ID</th><th>Título</th><th>Produtor</th><th>Cidade</th><th>Preço</th><th>Verificação</th></tr>
           </thead>
           <tbody>
             {% for p in products %}
@@ -168,6 +233,15 @@
               <td>{{ p.producer_name }}</td>
               <td>{{ p.city or "—" }}</td>
               <td>{% if p.price %}<span style="color:var(--field-dim);font-weight:600;">R$ {{ p.price }}</span>{% else %}—{% endif %}</td>
+              <td>
+                {% if p.moderation_status == 'aprovado' %}
+                  <span class="badge badge-green" title="{{ p.moderation_reason or '' }}">Aprovado</span>
+                {% elif p.moderation_status == 'rejeitado' %}
+                  <span class="badge badge-red" title="{{ p.moderation_reason or '' }}">Rejeitado</span>
+                {% else %}
+                  <span class="badge badge-gold" title="{{ p.moderation_reason or '' }}">Em análise</span>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>

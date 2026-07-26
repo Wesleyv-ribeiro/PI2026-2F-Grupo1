@@ -82,6 +82,13 @@
                 <img src="{{ url_for('static', filename=p.image_path) }}" alt="{{ p.title }}" class="card-image">
               {% endif %}
               <span class="card-tag tag-green">Produto</span>
+              {% if p.moderation_status == 'aprovado' %}
+                <span class="badge badge-green">Publicado no Mercado</span>
+              {% elif p.moderation_status == 'rejeitado' %}
+                <span class="badge badge-red">Não publicado</span>
+              {% else %}
+                <span class="badge badge-gold">Em análise pelo admin</span>
+              {% endif %}
               {% if p.made_to_order %}
                 <span class="badge badge-brown">Feito na hora</span>
               {% elif p.stock == 0 %}
@@ -92,6 +99,11 @@
               <h3 class="card-title">{{ p.title }}</h3>
               <p class="card-desc">{{ p.description|truncate(120) }}</p>
               {% if p.price %}<p class="price">R$ {{ p.price }}</p>{% endif %}
+              {% if p.moderation_status != 'aprovado' and p.moderation_reason %}
+                <p style="font-size:0.78rem;color:var(--muted);margin-top:0.25rem;">
+                  <strong>Motivo:</strong> {{ p.moderation_reason }}
+                </p>
+              {% endif %}
               {% if not p.made_to_order %}
               <form method="post" action="{{ url_for('update_product_stock', product_id=p.id) }}" class="stock-controls">
                 <label for="stock-{{ p.id }}">Estoque</label>
