@@ -23,6 +23,10 @@
     <p class="form-footer-link">
       Ainda não tem conta? <a href="{{ url_for('register') }}">Criar conta grátis</a>
     </p>
+    <p class="form-footer-link" style="margin-top:0.25rem;">
+      Não recebeu o e-mail de confirmação?
+      <a href="{{ url_for('resend_verification') }}">Reenviar confirmação</a>
+    </p>
   </div>
 </div>
 {% endblock %}

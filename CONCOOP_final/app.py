@@ -1,6 +1,7 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
+import secrets
 from pathlib import Path
 
 import psycopg2
@@ -18,6 +19,9 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+
+import moderation
+import email_utils
 
 try:
     from dotenv import load_dotenv
@@ -502,6 +506,7 @@ def create_app():
                     error = "Este e-mail já está cadastrado."
 
             if error is None:
+                verify_token = secrets.token_urlsafe(32)
                 db.execute(
                     """
                     INSERT INTO users (
@@ -514,9 +519,12 @@ def create_app():
                         crmv,
                         is_vet_verified,
                         profile_image,
-                        is_admin
+                        is_admin,
+                        email_verified,
+                        email_verify_token,
+                        email_verify_sent_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         name,
@@ -529,10 +537,39 @@ def create_app():
                         0,
                         profile_image_path,
                         0,
+                        0,
+                        verify_token,
+                        datetime.utcnow(),
                     ),
                 )
                 db.commit()
-                flash("Cadastro realizado com sucesso! Faça login.", "success")
+
+                verify_url = url_for("verify_email", token=verify_token, _external=True)
+                sent = email_utils.send_verification_email(email, name, verify_url)
+
+                if sent:
+                    flash(
+                        "Cadastro realizado! Enviamos um e-mail de confirmação "
+                        f"para {email}. Clique no link recebido para ativar sua "
+                        "conta antes de fazer login.",
+                        "success",
+                    )
+                else:
+                    # Envio de e-mail falhou (ou não está configurado no
+                    # servidor). Para não impedir o uso da plataforma nesse
+                    # caso, liberamos a conta automaticamente e avisamos o
+                    # usuário.
+                    db.execute(
+                        "UPDATE users SET email_verified = 1 WHERE email = ?",
+                        (email,),
+                    )
+                    db.commit()
+                    flash(
+                        "Cadastro realizado com sucesso! (Não foi possível "
+                        "enviar o e-mail de confirmação no momento, então sua "
+                        "conta já está liberada para uso.) Faça login.",
+                        "success",
+                    )
                 return redirect(url_for("login"))
             else:
                 flash(error, "error")
@@ -554,6 +591,12 @@ def create_app():
                 error = "E-mail ou senha inválidos."
             elif not user["is_active"]:
                 error = "Esta conta foi suspensa. Entre em contato com a administração."
+            elif not user["email_verified"]:
+                error = (
+                    "Você precisa confirmar seu e-mail antes de entrar. "
+                    "Verifique sua caixa de entrada (e o spam) ou use o link "
+                    "\"Reenviar confirmação\" abaixo."
+                )
 
             if error is None:
                 session.clear()
@@ -564,6 +607,95 @@ def create_app():
                 flash(error, "error")
 
         return render_template("login.html")
+
+    @app.route("/verify-email/<token>")
+    def verify_email(token):
+        """Confirma o e-mail do usuário a partir do link enviado por e-mail."""
+        db = get_db()
+        user = db.execute(
+            "SELECT id, email_verified, email_verify_sent_at FROM users WHERE email_verify_token = ?",
+            (token,),
+        ).fetchone()
+
+        if user is None:
+            flash("Link de confirmação inválido. Solicite um novo link abaixo.", "error")
+            return redirect(url_for("resend_verification"))
+
+        if user["email_verified"]:
+            flash("Este e-mail já havia sido confirmado. Você já pode fazer login.", "success")
+            return redirect(url_for("login"))
+
+        sent_at = user["email_verify_sent_at"]
+        if sent_at is not None and datetime.utcnow() - sent_at > timedelta(hours=48):
+            flash(
+                "Este link de confirmação expirou. Solicite um novo link abaixo.",
+                "error",
+            )
+            return redirect(url_for("resend_verification"))
+
+        db.execute(
+            """
+            UPDATE users
+            SET email_verified = 1, email_verify_token = NULL
+            WHERE id = ?
+            """,
+            (user["id"],),
+        )
+        db.commit()
+        flash("E-mail confirmado com sucesso! Você já pode fazer login.", "success")
+        return redirect(url_for("login"))
+
+    @app.route("/resend-verification", methods=["GET", "POST"])
+    def resend_verification():
+        """Permite reenviar o e-mail de confirmação caso o usuário não tenha
+        recebido ou o link tenha expirado."""
+        if request.method == "POST":
+            email = request.form.get("email", "").strip().lower()
+            db = get_db()
+            user = db.execute(
+                "SELECT id, name, email, email_verified FROM users WHERE email = ?",
+                (email,),
+            ).fetchone()
+
+            # Resposta genérica sempre, para não revelar quais e-mails
+            # estão cadastrados na plataforma.
+            generic_message = (
+                "Se este e-mail estiver cadastrado e pendente de confirmação, "
+                "enviamos um novo link de verificação para ele."
+            )
+
+            if user is not None and not user["email_verified"]:
+                new_token = secrets.token_urlsafe(32)
+                db.execute(
+                    """
+                    UPDATE users
+                    SET email_verify_token = ?, email_verify_sent_at = ?
+                    WHERE id = ?
+                    """,
+                    (new_token, datetime.utcnow(), user["id"]),
+                )
+                db.commit()
+                verify_url = url_for("verify_email", token=new_token, _external=True)
+                sent = email_utils.send_verification_email(user["email"], user["name"], verify_url)
+                if sent:
+                    flash(generic_message, "success")
+                else:
+                    db.execute(
+                        "UPDATE users SET email_verified = 1 WHERE id = ?",
+                        (user["id"],),
+                    )
+                    db.commit()
+                    flash(
+                        "Não foi possível enviar o e-mail agora, então sua "
+                        "conta já foi liberada automaticamente. Tente fazer login.",
+                        "success",
+                    )
+            else:
+                flash(generic_message, "success")
+
+            return redirect(url_for("login"))
+
+        return render_template("resend_verification.html")
 
     @app.route("/logout")
     def logout():
@@ -593,7 +725,8 @@ def create_app():
         if g.user["role"] == "produtor":
             products = db.execute(
                 """
-                SELECT id, title, description, price, stock, made_to_order, created_at, image_path
+                SELECT id, title, description, price, stock, made_to_order, created_at,
+                       image_path, moderation_status, moderation_reason
                 FROM products
                 WHERE producer_id = ?
                 ORDER BY created_at DESC
@@ -683,6 +816,15 @@ def create_app():
                             "error",
                         )
                         return redirect(url_for("new_product"))
+
+                # Verificação automática de conteúdo com IA (Gemini) para
+                # impedir a publicação de produtos ilícitos ou proibidos.
+                # Em caso de dúvida (ou falha na verificação), o produto
+                # fica pendente para revisão manual no painel de admin.
+                check = moderation.check_product_content(
+                    title=title, description=description, price=price
+                )
+
                 db.execute(
                     """
                     INSERT INTO products (
@@ -693,9 +835,12 @@ def create_app():
                         stock,
                         made_to_order,
                         created_at,
-                        image_path
+                        image_path,
+                        moderation_status,
+                        moderation_reason,
+                        moderation_checked_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         g.user["id"],
@@ -706,10 +851,31 @@ def create_app():
                         made_to_order,
                         datetime.utcnow(),
                         image_path,
+                        check.status,
+                        check.reason,
+                        datetime.utcnow(),
                     ),
                 )
                 db.commit()
-                flash("Produto cadastrado com sucesso!", "success")
+
+                if check.is_approved:
+                    flash("Produto cadastrado e publicado no Mercado!", "success")
+                elif check.is_rejected:
+                    flash(
+                        "Seu produto foi cadastrado, mas NÃO foi publicado no "
+                        "Mercado: nossa verificação automática identificou que "
+                        f"ele pode violar as regras da plataforma ({check.reason}). "
+                        "Se acredita que isso é um engano, entre em contato com o "
+                        "suporte.",
+                        "error",
+                    )
+                else:
+                    flash(
+                        "Produto cadastrado! Ele passará por uma revisão manual "
+                        "antes de aparecer no Mercado, pois nossa verificação "
+                        "automática não teve certeza sobre o conteúdo.",
+                        "info",
+                    )
                 return redirect(url_for("dashboard"))
 
         return render_template("new_product.html")
@@ -775,7 +941,8 @@ def create_app():
                 u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
-            WHERE p.stock > 0 OR p.made_to_order = 1
+            WHERE (p.stock > 0 OR p.made_to_order = 1)
+              AND p.moderation_status = 'aprovado'
             ORDER BY p.created_at DESC
             """
         ).fetchall()
@@ -1159,17 +1326,30 @@ def create_app():
         db = get_db()
         users = db.execute(
             """
-            SELECT id, name, email, role, city, crmv, is_vet_verified, is_admin, is_active
+            SELECT id, name, email, role, city, crmv, is_vet_verified, is_admin, is_active, email_verified
             FROM users
             ORDER BY id ASC
             """
         ).fetchall()
         products = db.execute(
             """
-            SELECT p.id, p.title, p.price, p.is_featured, u.name AS producer_name, u.city
+            SELECT p.id, p.title, p.price, p.is_featured,
+                   p.moderation_status, p.moderation_reason,
+                   u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
             ORDER BY p.id DESC
+            """
+        ).fetchall()
+        pending_products = db.execute(
+            """
+            SELECT p.id, p.title, p.description, p.price, p.image_path,
+                   p.moderation_reason, p.created_at,
+                   u.name AS producer_name, u.id AS producer_id
+            FROM products p
+            JOIN users u ON p.producer_id = u.id
+            WHERE p.moderation_status = 'pendente'
+            ORDER BY p.created_at ASC
             """
         ).fetchall()
         messages = db.execute(
@@ -1194,6 +1374,7 @@ def create_app():
             "admin_dashboard.html",
             users=users,
             products=products,
+            pending_products=pending_products,
             messages=messages,
             pending_reports=pending_reports,
         )
@@ -1290,6 +1471,73 @@ def create_app():
         db.commit()
 
         flash("Destaque do produto atualizado.", "success")
+        return redirect(url_for("admin_dashboard"))
+
+    @app.route("/admin/product/<int:product_id>/approve", methods=["POST"])
+    def admin_approve_product(product_id):
+        """Aprova manualmente um produto que ficou pendente na verificação
+        automática (segunda verificação humana)."""
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        product = db.execute(
+            "SELECT id FROM products WHERE id = ?", (product_id,)
+        ).fetchone()
+        if product is None:
+            flash("Produto não encontrado.", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        db.execute(
+            """
+            UPDATE products
+            SET moderation_status = 'aprovado',
+                moderation_reason = 'Aprovado manualmente por administrador.',
+                moderation_checked_at = ?
+            WHERE id = ?
+            """,
+            (datetime.utcnow(), product_id),
+        )
+        db.commit()
+        flash("Produto aprovado e publicado no Mercado.", "success")
+        return redirect(url_for("admin_dashboard"))
+
+    @app.route("/admin/product/<int:product_id>/reject", methods=["POST"])
+    def admin_reject_product(product_id):
+        """Rejeita manualmente um produto pendente (segunda verificação
+        humana), impedindo que ele apareça no Mercado."""
+        if g.user is None or not g.user["is_admin"]:
+            flash("Acesso restrito ao administrador.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        product = db.execute(
+            "SELECT id FROM products WHERE id = ?", (product_id,)
+        ).fetchone()
+        if product is None:
+            flash("Produto não encontrado.", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        admin_reason = request.form.get("reason", "").strip()
+        reason = (
+            f"Rejeitado manualmente por administrador. Motivo: {admin_reason}"
+            if admin_reason
+            else "Rejeitado manualmente por administrador."
+        )
+
+        db.execute(
+            """
+            UPDATE products
+            SET moderation_status = 'rejeitado',
+                moderation_reason = ?,
+                moderation_checked_at = ?
+            WHERE id = ?
+            """,
+            (reason, datetime.utcnow(), product_id),
+        )
+        db.commit()
+        flash("Produto rejeitado e removido do Mercado.", "success")
         return redirect(url_for("admin_dashboard"))
 
     @app.route("/servicos")
@@ -1451,17 +1699,20 @@ def create_app():
 
         products = []
         if user["role"] == "produtor":
+            is_owner = g.user is not None and g.user["id"] == user["id"]
             products = db.execute(
                 """
-                SELECT id, title, description, price, stock, made_to_order, created_at, image_path
+                SELECT id, title, description, price, stock, made_to_order, created_at,
+                       image_path, moderation_status, moderation_reason
                                 ,(
                                     SELECT COUNT(*) FROM reports rep WHERE rep.target_type = 'product' AND rep.target_id = products.id AND rep.is_resolved = 0
                                 ) AS report_count
                                 FROM products
                                 WHERE producer_id = ?
+                                  AND (? OR moderation_status = 'aprovado')
                                 ORDER BY created_at DESC
                 """,
-                (user["id"],),
+                (user["id"], is_owner),
             ).fetchall()
 
         return render_template("profile.html", user=user, products=products)
@@ -1595,6 +1846,45 @@ def init_db():
     )
     db.execute(
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 1"
+    )
+
+    # Moderação automática de produtos (verificação via IA - Gemini).
+    # moderation_status: 'aprovado' (visível no marketplace), 'pendente'
+    # (aguardando revisão de um administrador) ou 'rejeitado' (bloqueado).
+    db.execute(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS moderation_status "
+        "TEXT NOT NULL DEFAULT 'pendente'"
+    )
+    db.execute(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS moderation_reason TEXT"
+    )
+    db.execute(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS moderation_checked_at TIMESTAMP"
+    )
+    # Produtos já cadastrados antes desta migração (sem verificação registrada)
+    # são considerados aprovados, já que estavam publicados antes de a
+    # verificação automática existir.
+    db.execute(
+        "UPDATE products SET moderation_status = 'aprovado' "
+        "WHERE moderation_checked_at IS NULL AND moderation_status = 'pendente'"
+    )
+
+    # Verificação de e-mail no cadastro (confirmação por link enviado via Gmail).
+    db.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0"
+    )
+    db.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_token TEXT"
+    )
+    db.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_sent_at TIMESTAMP"
+    )
+    # Contas criadas antes desta migração (nunca passaram por um envio de
+    # verificação) são consideradas confirmadas, para não bloquear o login
+    # de quem já usava a plataforma.
+    db.execute(
+        "UPDATE users SET email_verified = 1 "
+        "WHERE email_verified = 0 AND email_verify_sent_at IS NULL"
     )
 
 

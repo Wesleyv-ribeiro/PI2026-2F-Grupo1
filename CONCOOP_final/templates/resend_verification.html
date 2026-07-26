@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Reenviar confirmação — CONCOOP{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div class="auth-logo-badge">C</div>
+    <h1 class="auth-title">Reenviar confirmação</h1>
+    <p class="auth-sub">
+      Informe o e-mail usado no cadastro. Se ele estiver pendente de
+      confirmação, enviaremos um novo link.
+    </p>
+
+    <form method="post" class="form-grid">
+      <div class="form-field">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" name="email" placeholder="seu@email.com" required autofocus>
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg btn-full" style="margin-top:0.5rem;">
+        Reenviar e-mail de confirmação
+      </button>
+    </form>
+
+    <p class="form-footer-link">
+      <a href="{{ url_for('login') }}">Voltar para o login</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

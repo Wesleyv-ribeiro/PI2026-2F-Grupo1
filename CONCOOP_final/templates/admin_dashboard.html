@@ -148,7 +148,7 @@
           <thead>
             <tr>
               <th>ID</th><th>Nome</th><th>E-mail</th><th>Tipo</th>
-              <th>Cidade</th><th>CRMV</th><th>Verificado</th><th>Admin</th><th>Status</th><th>Ações</th>
+              <th>Cidade</th><th>CRMV</th><th>Verificado</th><th>Admin</th><th>E-mail confirmado</th><th>Status</th><th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -180,6 +180,13 @@
               <td>
                 {% if u.is_admin %}<span class="badge badge-gold">Admin</span>
                 {% else %}<span style="color:var(--muted);font-size:0.82rem;">Não</span>{% endif %}
+              </td>
+              <td>
+                {% if u.email_verified %}
+                  <span class="badge badge-green">Confirmado</span>
+                {% else %}
+                  <span class="badge badge-gold">Pendente</span>
+                {% endif %}
               </td>
               <td>
                 {% if u.is_active %}
