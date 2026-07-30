@@ -48,36 +48,29 @@ STATUS_PENDING = "pendente"
 _VALID_STATUSES = {STATUS_APPROVED, STATUS_REJECTED, STATUS_PENDING}
 
 _SYSTEM_INSTRUCTION = """\
-Você é um sistema de moderação de conteúdo de um marketplace agropecuário \
-brasileiro chamado CONCOOP, onde produtores rurais anunciam produtos \
-(alimentos, artesanato, insumos agrícolas, animais de produção, etc.).
+Você é um sistema rigoroso de moderação de conteúdo de um marketplace agropecuário brasileiro (CONCOOP).
+Sua tarefa é analisar TÍTULO, DESCRIÇÃO e PREÇO de um anúncio de produto e classificá-lo.
 
-Sua única tarefa é analisar o TÍTULO, a DESCRIÇÃO e o PREÇO de um anúncio \
-de produto e decidir se ele pode ser publicado.
+Regras de Classificação:
 
-Reprove (decision = "rejected") somente quando houver indícios CLAROS de que o \
-produto é:
-- Ilícito (drogas/entorpecentes, armas de fogo, munição, explosivos);
-- Vida selvagem/animais protegidos por lei sem documentação (tráfico de \
-  animais silvestres, partes de animais protegidos);
-- Medicamentos controlados, agrotóxicos ou produtos veterinários sem registro \
-  vendidos de forma irregular;
-- Produtos falsificados/pirateados;
-- Qualquer outro item cuja comercialização seja proibida por lei no Brasil.
+1. REPROVE DE IMEDIATO (decision = "rejected"):
+   - Qualquer item ILÍCITO ou PROIBIDO por lei no Brasil.
+   - Drogas, entorpecentes, substâncias controladas ou ilícitas.
+   - Armas de fogo, munição, explosivos, armas brancas graves.
+   - Animais silvestres, partes de animais protegidos ou caça sem documentação.
+   - Agrotóxicos ou medicamentos veterinários de venda controlada/sem registro no MAPA/ANVISA.
+   - Produtos falsificados, pirateados ou de origem ilegal flagrante.
 
-Aprove (decision = "approved") quando o produto for claramente um produto \
-agropecuário/artesanal lícito comum (ex: mel, queijo, hortaliças, carnes de \
-criação regular, artesanato, mudas, sementes, serviços agrícolas, etc.) e não \
-houver nenhum sinal de irregularidade.
+2. APROVE (decision = "approved"):
+   - Produtos agropecuários, hortifrúti, alimentos, bebidas de produção própria/artesanal.
+   - Animais de criação regular (bovinos, suínos, aves de postura/corte, peixes de piscicultura).
+   - Insumos agrícolas normais, sementes, mudas, ferramentas, máquinas e serviços rurais lícitos.
 
-Se houver qualquer dúvida, ambiguidade, linguagem vaga, gírias suspeitas, ou \
-informação insuficiente para ter certeza, responda decision = "uncertain" \
-para que um administrador humano revise manualmente. Na dúvida, SEMPRE \
-prefira "uncertain" em vez de "approved".
+3. USE APENAS QUANDO HOUVER AMBIGUIDADE REAL (decision = "uncertain"):
+   - Somente se as informações forem completamente ilegíveis, desconexas ou faltar o contexto mínimo para entender o que é o produto.
 
-Responda ESTRITAMENTE em JSON, sem markdown, sem texto adicional, no formato:
-{"decision": "approved" | "rejected" | "uncertain", "reason": "justificativa \
-curta em português, no máximo 2 frases"}
+Responda ESTRITAMENTE em JSON sem formatação markdown:
+{"decision": "approved" | "rejected" | "uncertain", "reason": "justificativa curta em português em até 2 frases"}
 """
 
 
@@ -127,79 +120,58 @@ def _extract_json(text: str) -> Optional[dict]:
             return None
     return None
 
+from google import genai
+from google.genai import types
 
 def check_product_content(
     title: str,
     description: str,
     price: Optional[str] = None,
 ) -> ModerationResult:
-    """
-    Envia o título/descrição/preço do produto para o Gemini e retorna
-    um ModerationResult com o status ("aprovado", "rejeitado" ou "pendente")
-    e a justificativa.
-
-    Nunca levanta exceção: qualquer falha de configuração, rede ou parsing
-    resulta em status "pendente", para que o item seja revisado manualmente
-    pelo administrador em vez de ser publicado sem verificação.
-    """
     title = (title or "").strip()
     description = (description or "").strip()
     price = (price or "").strip()
 
     if not GEMINI_API_KEY:
-        logger.warning(
-            "GEMINI_API_KEY não configurada. Produto enviado para revisão manual."
-        )
+        logger.warning("GEMINI_API_KEY não configurada.")
         return _fallback_pending(
-            "Verificação automática indisponível (chave da API do Gemini não "
-            "configurada). Aguardando revisão de um administrador."
+            "Verificação automática indisponível (chave da API não configurada)."
         )
+
+    prompt = f"""
+    Por favor, analise a seguinte oferta de produto:
+
+    - TÍTULO DO PRODUTO: {title}
+    - DESCRIÇÃO DO PRODUTO: {description}
+    - PREÇO: {price or 'não informado'}
+    """
 
     try:
-        import google.generativeai as genai
-    except ImportError:
-        logger.exception(
-            "Pacote 'google-generativeai' não instalado. Rode: "
-            "pip install google-generativeai"
-        )
-        return _fallback_pending(
-            "Verificação automática indisponível (dependência ausente). "
-            "Aguardando revisão de um administrador."
-        )
+        # Inicializa o cliente com a nova SDK
+        client = genai.Client(api_key=GEMINI_API_KEY)
 
-    prompt = (
-        f"TÍTULO: {title}\n"
-        f"DESCRIÇÃO: {description}\n"
-        f"PREÇO: {price or 'não informado'}\n"
-    )
-
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(
-            model_name=GEMINI_MODEL,
-            system_instruction=_SYSTEM_INSTRUCTION,
-        )
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0,
-            },
+        # Chama o modelo gemini-2.0-flash
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=_SYSTEM_INSTRUCTION,
+                response_mime_type="application/json",
+                temperature=0,
+            ),
         )
         raw_text = (response.text or "").strip()
-    except Exception:  # noqa: BLE001 - qualquer erro da API cai em pendente
-        logger.exception("Falha ao consultar a API do Gemini para moderação.")
+    except Exception as e:
+        logger.exception(f"Falha ao consultar a API do Gemini: {e}")
         return _fallback_pending(
-            "Não foi possível concluir a verificação automática no momento. "
-            "Aguardando revisão de um administrador."
+            "Não foi possível concluir a verificação automática no momento."
         )
 
     data = _extract_json(raw_text)
     if not data or "decision" not in data:
         logger.warning("Resposta do Gemini em formato inesperado: %r", raw_text)
         return _fallback_pending(
-            "A verificação automática retornou uma resposta inesperada. "
-            "Aguardando revisão de um administrador."
+            "A verificação automática retornou uma resposta inesperada."
         )
 
     decision = str(data.get("decision", "")).strip().lower()
@@ -209,5 +181,5 @@ def check_product_content(
         return ModerationResult(status=STATUS_APPROVED, reason=reason, raw_decision=decision)
     if decision == "rejected":
         return ModerationResult(status=STATUS_REJECTED, reason=reason, raw_decision=decision)
-    # "uncertain" ou qualquer valor não reconhecido -> pendente (revisão humana)
+
     return ModerationResult(status=STATUS_PENDING, reason=reason, raw_decision=decision)
