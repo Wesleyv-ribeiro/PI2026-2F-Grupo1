@@ -76,6 +76,7 @@ h1, h2, h3, h4 {
   align-items: center;
   gap: 1.5rem;
   padding: 0.85rem 0;
+  min-height: 72px;
 }
 .logo {
   display: flex;
@@ -530,6 +531,8 @@ h1, h2, h3, h4 {
 .auth-box-register { width: min(520px,100%); }
 .auth-box .form-grid { gap: 1rem; }
 .auth-box .form-field { gap: 0.45rem; }
+.auth-title { font-size: clamp(1.72rem, 5vw, 2rem); }
+.auth-sub { font-size: 0.94rem; }
 .auth-logo-badge { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--field), var(--hay)); display: grid; place-items: center; margin: 0 auto 1.5rem; font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.4rem; color: #fff; }
 .auth-title { text-align: center; font-size: 1.75rem; margin-bottom: 0.4rem; }
 .auth-sub { text-align: center; color: var(--muted); font-size: 0.9rem; margin-bottom: 1.75rem; }
@@ -1239,8 +1242,14 @@ a.admin-stat:hover { border-color: var(--field); }
   body { font-size: 15px; }
   .container { width: calc(100% - 0.75rem); }
   .page-body { padding-top: 1rem; }
+  .header-inner { min-height: 62px; }
   .auth-wrap { padding: 1.4rem 0.75rem 2rem; }
   .auth-wrap-register { padding-top: 1.8rem; }
+  .auth-box { width: 100%; max-width: 100%; padding: 1.5rem 1rem 1.2rem; }
+  .auth-box-register { padding: 1.4rem 0.95rem 1.2rem; }
+  .auth-title { font-size: 1.55rem; }
+  .auth-sub { font-size: 0.88rem; }
+  .auth-box .form-grid { gap: 0.9rem; }
   .admin-stats { grid-template-columns: 1fr; }
   .dashboard-actions { gap: 0.5rem !important; }
   .dashboard-actions .btn,
