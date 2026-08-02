@@ -17,10 +17,11 @@ from flask import (
     url_for,
     flash,
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-import Moderation
+import moderation
 import email_utils
 
 try:
@@ -66,6 +67,40 @@ DEFAULT_DATABASE_URL = os.getenv(
     "postgresql://postgres:Morango@127.0.0.1:5432/concoop",
 )
 
+ALLOWED_ROLES = {
+    "produtor",
+    "servidor",
+    "veterinario",
+    "usuario",
+    "vendedor",
+    "loja",
+}
+PRODUCT_ROLES = {"produtor", "vendedor", "loja"}
+SERVICE_ROLES = {"servidor"}
+ROLE_LABELS = {
+    "produtor": "Produtor Rural",
+    "servidor": "Prestador de Serviços",
+    "veterinario": "Veterinário",
+    "usuario": "Usuário Comum",
+    "vendedor": "Vendedor",
+    "loja": "Loja",
+}
+
+
+def normalize_role(role: str | None) -> str | None:
+    if role is None:
+        return None
+    normalized = str(role).strip().lower()
+    return normalized if normalized in ALLOWED_ROLES else None
+
+
+def can_create_product(role: str | None) -> bool:
+    return normalize_role(role) in PRODUCT_ROLES
+
+
+def can_create_service(role: str | None) -> bool:
+    return normalize_role(role) in SERVICE_ROLES
+
 
 class PostgresCompatConnection:
     """Conexão PostgreSQL com API simples para execute/commit/close."""
@@ -87,23 +122,23 @@ class PostgresCompatConnection:
 
 
 def connect_db():
+    # O psycopg2 no Windows le TODAS as variaveis de ambiente do sistema,
+    # incluindo caminhos como C:\Users\Usuário que contem bytes nao-ASCII.
+    # Solucao: parsear a URL manualmente e conectar por parametros nomeados,
+    # sem passar a DSN string (assim o psycopg2 nao toca no ambiente).
+    from urllib.parse import urlparse, unquote
+    parsed = urlparse(DEFAULT_DATABASE_URL)
+
+    def _do_connect():
+        return psycopg2.connect(
+            host=parsed.hostname or "127.0.0.1",
+            port=parsed.port or 5432,
+            dbname=(parsed.path or "/concoop").lstrip("/"),
+            user=unquote(parsed.username or "postgres"),
+            password=unquote(parsed.password or "postgres"),
+        )
+
     try:
-        # O psycopg2 no Windows le TODAS as variaveis de ambiente do sistema,
-        # incluindo caminhos como C:\Users\Usuário que contem bytes nao-ASCII.
-        # Solucao: parsear a URL manualmente e conectar por parametros nomeados,
-        # sem passar a DSN string (assim o psycopg2 nao toca no ambiente).
-        from urllib.parse import urlparse, unquote
-        parsed = urlparse(DEFAULT_DATABASE_URL)
-
-        def _do_connect():
-            return psycopg2.connect(
-                host=parsed.hostname or "127.0.0.1",
-                port=parsed.port or 5432,
-                dbname=(parsed.path or "/concoop").lstrip("/"),
-                user=unquote(parsed.username or "postgres"),
-                password=unquote(parsed.password or "postgres"),
-            )
-
         raw_conn = _do_connect()
         return PostgresCompatConnection(raw_conn)
     except OperationalError as exc:
@@ -351,8 +386,13 @@ def get_report_target_owner(db, target_type, target_id):
 
 def create_app():
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = "change-this-secret-key"
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "change-this-secret-key")
     app.config["DATABASE_URL"] = DEFAULT_DATABASE_URL
+    app.config["PREFERRED_URL_SCHEME"] = os.getenv("PREFERRED_URL_SCHEME", "https")
+    server_name = os.getenv("SERVER_NAME", "").strip()
+    if server_name:
+        app.config["SERVER_NAME"] = server_name
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
     ensure_upload_dirs()
 
     @app.before_request
@@ -470,7 +510,7 @@ def create_app():
             name = request.form["name"].strip()
             email = request.form["email"].strip().lower()
             password = request.form["password"]
-            role = request.form.get("role")
+            role = normalize_role(request.form.get("role"))
             city = request.form.get("city", "").strip()
             bio = request.form.get("bio", "").strip()
             crmv_input = request.form.get("crmv", "").strip()
@@ -479,6 +519,8 @@ def create_app():
             error = None
             if not name or not email or not password or not role:
                 error = "Preencha todos os campos obrigatórios."
+            elif role not in ALLOWED_ROLES:
+                error = "Tipo de conta inválido."
             crmv_normalizado = None
             if error is None and role == "veterinario":
                 if not crmv_input:
@@ -722,7 +764,7 @@ def create_app():
             (g.user["id"],),
         ).fetchall()
 
-        if g.user["role"] == "produtor":
+        if can_create_product(g.user["role"]):
             products = db.execute(
                 """
                 SELECT id, title, description, price, stock, made_to_order, created_at,
@@ -788,8 +830,8 @@ def create_app():
 
     @app.route("/products/new", methods=["GET", "POST"])
     def new_product():
-        if g.user is None or g.user["role"] != "produtor":
-            flash("Apenas produtores podem cadastrar produtos.", "error")
+        if g.user is None or not can_create_product(g.user["role"]):
+            flash("Apenas perfis de produtor, vendedor ou loja podem cadastrar produtos.", "error")
             return redirect(url_for("login"))
 
         if request.method == "POST":
@@ -1385,7 +1427,7 @@ def create_app():
             flash("Acesso restrito ao administrador.", "error")
             return redirect(url_for("index"))
 
-        target = request.form.get("target")  # all, produtores, veterinarios, usuarios
+        target = request.form.get("target")  # all, produtores, vendedores, lojas, veterinarios, usuarios
         content = request.form.get("content", "").strip()
 
         if not content:
@@ -1395,6 +1437,10 @@ def create_app():
         role_filter = None
         if target == "produtores":
             role_filter = "produtor"
+        elif target == "vendedores":
+            role_filter = "vendedor"
+        elif target == "lojas":
+            role_filter = "loja"
         elif target == "veterinarios":
             role_filter = "veterinario"
         elif target == "usuarios":
@@ -1698,7 +1744,7 @@ def create_app():
             return redirect(url_for("index"))
 
         products = []
-        if user["role"] == "produtor":
+        if can_create_product(user["role"]):
             is_owner = g.user is not None and g.user["id"] == user["id"]
             products = db.execute(
                 """
@@ -1735,7 +1781,7 @@ def init_db():
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
-            role TEXT NOT NULL CHECK (role IN ('produtor', 'veterinario', 'usuario')),
+            role TEXT NOT NULL CHECK (role IN ('produtor', 'servidor', 'veterinario', 'usuario', 'vendedor', 'loja')),
             city TEXT,
             bio TEXT,
             crmv TEXT,
@@ -1821,6 +1867,22 @@ def init_db():
         """
     )
 
+    existing_constraints = db.execute(
+        """
+        SELECT conname
+        FROM pg_constraint
+        WHERE conrelid = 'users'::regclass
+          AND contype = 'c'
+          AND pg_get_constraintdef(oid) ILIKE '%role IN%'
+        """
+    ).fetchall()
+    for row in existing_constraints:
+        db.execute(
+            f"ALTER TABLE users DROP CONSTRAINT IF EXISTS {row['conname']}"
+        )
+    db.execute(
+        "ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('produtor', 'servidor', 'veterinario', 'usuario', 'vendedor', 'loja'))"
+    )
     db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS crmv TEXT")
     db.execute(
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_vet_verified INTEGER NOT NULL DEFAULT 0"
@@ -1916,7 +1978,7 @@ def seed_admin():
                 profile_image,
                 is_admin
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "Administrador",
@@ -1939,4 +2001,7 @@ if __name__ == "__main__":
     init_db()
     seed_admin()
     app = create_app()
-    app.run(debug=True)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "0").lower() in {"1", "true", "yes", "on"}
+    app.run(host=host, port=port, debug=debug)

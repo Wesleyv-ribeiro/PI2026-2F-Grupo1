@@ -27,6 +27,8 @@
         <h2 style="font-size:1.2rem;margin-bottom:0.25rem;">{{ g.user.name }}</h2>
         <p class="card-meta" style="margin-bottom:1rem;">
           {% if g.user.role == 'produtor' %}Produtor Rural
+          {% elif g.user.role == 'vendedor' %}Vendedor
+          {% elif g.user.role == 'loja' %}Loja
           {% elif g.user.role == 'servidor' %}Prestador de Servicos
           {% elif g.user.role == 'veterinario' %}Veterinario
           {% else %}Usuario{% endif %}
@@ -43,7 +45,7 @@
 
         <div style="display:flex;flex-direction:column;gap:0.6rem;">
           <a href="{{ url_for('profile', user_id=g.user.id) }}" class="btn btn-outline btn-sm btn-full">Ver perfil público</a>
-          {% if g.user.role == 'produtor' %}
+          {% if g.user.role in ['produtor', 'vendedor', 'loja'] %}
             <a href="{{ url_for('new_product') }}" class="btn btn-primary btn-sm btn-full">+ Novo produto</a>
           {% endif %}
           <a href="{{ url_for('marketplace') }}" class="btn btn-ghost btn-sm btn-full">Explorar mercado</a>
@@ -68,8 +70,8 @@
     <!-- RIGHT: conteúdo dinâmico -->
     <div>
 
-      <!-- Produtos (só produtor) -->
-      {% if g.user.role == 'produtor' %}
+      <!-- Produtos (produtor, vendedor e loja) -->
+      {% if g.user.role in ['produtor', 'vendedor', 'loja'] %}
       <section class="section" style="margin-top:0;">
         <div class="section-header">
           <h2>Meus Produtos</h2>

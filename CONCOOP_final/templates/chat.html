@@ -23,6 +23,8 @@
           <p style="font-weight:700;font-size:0.95rem;color:var(--soil);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ other.name }}</p>
           <p style="font-size:0.78rem;color:var(--muted);margin-top:0.1rem;">
             {% if other.role == 'produtor' %} Produtor Rural
+            {% elif other.role == 'vendedor' %} Vendedor
+            {% elif other.role == 'loja' %} Loja
             {% elif other.role == 'servidor' %} Prestador de Serviços
             {% elif other.role == 'veterinario' %} Veterinário
             {% else %} Usuário{% endif %}

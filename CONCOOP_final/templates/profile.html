@@ -20,6 +20,8 @@
         <h1>{{ user.name }}</h1>
         <p>
           {% if user.role == 'produtor' %} Produtor Rural
+          {% elif user.role == 'vendedor' %} Vendedor
+          {% elif user.role == 'loja' %} Loja
           {% elif user.role == 'servidor' %} Prestador de Serviços
           {% elif user.role == 'veterinario' %} Veterinário
           {% else %} Usuário{% endif %}
@@ -89,9 +91,9 @@
       {% endif %}
     </div>
 
-    <!-- Produtos (se for produtor) -->
+    <!-- Produtos (se for produtor, vendedor ou loja) -->
     <div>
-      {% if user.role == 'produtor' %}
+      {% if user.role in ['produtor', 'vendedor', 'loja'] %}
         <div class="section-header" style="margin-bottom:1.25rem;">
           <h2>Produtos de {{ user.name }}</h2>
         </div>

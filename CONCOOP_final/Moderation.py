@@ -120,8 +120,13 @@ def _extract_json(text: str) -> Optional[dict]:
             return None
     return None
 
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:  # SDK opcional no servidor atual
+    genai = None
+    types = None
+
 
 def check_product_content(
     title: str,
@@ -136,6 +141,12 @@ def check_product_content(
         logger.warning("GEMINI_API_KEY não configurada.")
         return _fallback_pending(
             "Verificação automática indisponível (chave da API não configurada)."
+        )
+
+    if genai is None or types is None:
+        logger.warning("SDK do Gemini não instalada; deixando produto em revisão manual.")
+        return _fallback_pending(
+            "Verificação automática indisponível (SDK do Gemini não instalada)."
         )
 
     prompt = f"""
