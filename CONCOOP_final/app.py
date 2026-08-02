@@ -20,7 +20,7 @@ from flask import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-import moderation
+import Moderation
 import email_utils
 
 try:
@@ -63,7 +63,7 @@ if not os.getenv("DATABASE_URL"):
 
 DEFAULT_DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:Morango@127.0.0.1:5432/agrolink",
+    "postgresql://postgres:Morango@127.0.0.1:5432/concoop",
 )
 
 
@@ -99,7 +99,7 @@ def connect_db():
             return psycopg2.connect(
                 host=parsed.hostname or "127.0.0.1",
                 port=parsed.port or 5432,
-                dbname=(parsed.path or "/agrolink").lstrip("/"),
+                dbname=(parsed.path or "/concoop").lstrip("/"),
                 user=unquote(parsed.username or "postgres"),
                 password=unquote(parsed.password or "postgres"),
             )
@@ -113,7 +113,7 @@ def connect_db():
         raise RuntimeError(
             "Nao foi possivel conectar ao PostgreSQL. "
             "Verifique se o servidor está rodando, se o DB existe e se a URL está correta. "
-            "Exemplo: postgresql://agrolink:Morango@127.0.0.1:5432/agrolink\n"
+            "Exemplo: postgresql://agrolink:Morango@127.0.0.1:5432/concoop\n"
             f"Detalhes do erro: {error_details}"
         ) from exc
 
