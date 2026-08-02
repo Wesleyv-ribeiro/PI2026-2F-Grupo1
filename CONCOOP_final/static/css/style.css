@@ -108,9 +108,24 @@ h1, h2, h3, h4 {
   font-weight: 500;
   color: var(--muted);
   transition: all .18s;
+  position: relative;
 }
 .nav-link:hover { color: var(--field-dim); background: rgba(58,125,68,.09); }
-.nav-link.active { color: var(--field-dim); background: rgba(58,125,68,.12); font-weight: 600; }
+.nav-link.active {
+  color: var(--field-dim);
+  font-weight: 600;
+  background: transparent;
+}
+.nav-link.active::after {
+  content: "";
+  position: absolute;
+  left: 0.9rem;
+  right: 0.9rem;
+  bottom: -0.2rem;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(4, 76, 0, 0.82);
+}
 
 .header-right {
   display: flex;
