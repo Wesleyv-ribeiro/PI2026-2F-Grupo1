@@ -1766,6 +1766,9 @@ def create_app():
     return app
 
 
+app = create_app()
+
+
 def get_db():
     if "db" not in g:
         g.db = connect_db()
@@ -2000,7 +2003,6 @@ def seed_admin():
 if __name__ == "__main__":
     init_db()
     seed_admin()
-    app = create_app()
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "5000"))
     debug = os.getenv("FLASK_DEBUG", "0").lower() in {"1", "true", "yes", "on"}
