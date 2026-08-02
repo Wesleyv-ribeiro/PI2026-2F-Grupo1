@@ -119,10 +119,10 @@ h1, h2, h3, h4 {
 .nav-link.active::after {
   content: "";
   position: absolute;
-  left: 0.9rem;
-  right: 0.9rem;
-  bottom: -0.2rem;
-  height: 3px;
+  left: 1.1rem;
+  right: 1.1rem;
+  bottom: -0.1rem;
+  height: 2px;
   border-radius: 999px;
   background: rgba(4, 76, 0, 0.82);
 }
@@ -542,10 +542,10 @@ h1, h2, h3, h4 {
 ═══════════════════════════════════════════ */
 .auth-wrap { min-height: calc(100vh - 120px); display: grid; place-items: center; padding: 2.5rem 1rem 3rem; }
 .auth-wrap-register { padding-top: 3rem; }
-.auth-box { width: min(480px,100%); background: var(--white); border: 1px solid var(--border); border-radius: var(--r-xl); padding: 2.5rem 2.5rem 2rem; box-shadow: var(--shadow-lg); margin: 0 auto; }
+.auth-box { width: min(480px,100%); background: var(--white); border: 1px solid var(--border); border-radius: var(--r-xl); padding: 2.25rem 2rem 1.75rem; box-shadow: var(--shadow-lg); margin: 0 auto; }
 .auth-box-register { width: min(520px,100%); }
-.auth-box .form-grid { gap: 1rem; }
-.auth-box .form-field { gap: 0.45rem; }
+.auth-box .form-grid { gap: 0.9rem; }
+.auth-box .form-field { gap: 0.38rem; }
 .auth-title { font-size: clamp(1.72rem, 5vw, 2rem); }
 .auth-sub { font-size: 0.94rem; }
 .auth-logo-badge { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--field), var(--hay)); display: grid; place-items: center; margin: 0 auto 1.5rem; font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.4rem; color: #fff; }
@@ -1152,6 +1152,7 @@ a.admin-stat:hover { border-color: var(--field); }
   .header-right { width: 100%; justify-content: flex-end; }
   .nav { display: none; }
   .nav-toggle { display: flex; }
+  .nav-link.active::after { left: 0.9rem; right: 0.9rem; height: 2px; }
   .user-chip { display: none; }
   .logo-img { height: 38px; }
   .btn { min-width: 0; }
@@ -1260,11 +1261,12 @@ a.admin-stat:hover { border-color: var(--field); }
   .header-inner { min-height: 62px; }
   .auth-wrap { padding: 1.4rem 0.75rem 2rem; }
   .auth-wrap-register { padding-top: 1.8rem; }
-  .auth-box { width: 100%; max-width: 100%; padding: 1.5rem 1rem 1.2rem; }
-  .auth-box-register { padding: 1.4rem 0.95rem 1.2rem; }
+  .auth-box { width: 100%; max-width: 100%; padding: 1.2rem 0.9rem 1rem; }
+  .auth-box-register { padding: 1.2rem 0.9rem 1rem; }
   .auth-title { font-size: 1.55rem; }
   .auth-sub { font-size: 0.88rem; }
-  .auth-box .form-grid { gap: 0.9rem; }
+  .auth-box .form-grid { gap: 0.75rem; }
+  .form-field input, .form-field select, .form-field textarea { padding: 0.62rem 0.78rem; }
   .admin-stats { grid-template-columns: 1fr; }
   .dashboard-actions { gap: 0.5rem !important; }
   .dashboard-actions .btn,
