@@ -121,22 +121,41 @@ class PostgresCompatConnection:
         self._conn.close()
 
 
+def _ascii_safe_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return text
+    return text.encode("ascii", errors="ignore").decode("ascii")
+
+
 def connect_db():
     # O psycopg2 no Windows le TODAS as variaveis de ambiente do sistema,
     # incluindo caminhos como C:\Users\Usuário que contem bytes nao-ASCII.
-    # Solucao: parsear a URL manualmente e conectar por parametros nomeados,
-    # sem passar a DSN string (assim o psycopg2 nao toca no ambiente).
+    # Solucao: parsear a URL manualmente, limpar as variaveis PG* do ambiente
+    # antes da conexao e conectar por parametros nomeados, sem passar a DSN.
     from urllib.parse import urlparse, unquote
     parsed = urlparse(DEFAULT_DATABASE_URL)
 
     def _do_connect():
-        return psycopg2.connect(
-            host=parsed.hostname or "127.0.0.1",
-            port=parsed.port or 5432,
-            dbname=(parsed.path or "/concoop").lstrip("/"),
-            user=unquote(parsed.username or "postgres"),
-            password=unquote(parsed.password or "postgres"),
-        )
+        pg_env_snapshot = {}
+        for key in list(os.environ):
+            if key.startswith("PG"):
+                pg_env_snapshot[key] = os.environ[key]
+                os.environ.pop(key, None)
+
+        try:
+            return psycopg2.connect(
+                host=_ascii_safe_text(parsed.hostname or "127.0.0.1"),
+                port=parsed.port or 5432,
+                dbname=_ascii_safe_text((parsed.path or "/concoop").lstrip("/")),
+                user=_ascii_safe_text(unquote(parsed.username or "postgres")),
+                password=_ascii_safe_text(unquote(parsed.password or "postgres")),
+            )
+        finally:
+            for key, value in pg_env_snapshot.items():
+                os.environ[key] = value
 
     try:
         raw_conn = _do_connect()

@@ -39,7 +39,7 @@
         {% endif %}
 
         {% if g.user and g.user.id != user.id %}
-          <div style="margin-top:1.25rem;display:flex;gap:0.6rem;flex-wrap:wrap;">
+          <div class="profile-hero-actions" style="margin-top:1.25rem;display:flex;gap:0.6rem;flex-wrap:wrap;">
             <a href="{{ url_for('chat', user_id=user.id) }}" class="btn btn-gold">
                Enviar mensagem
             </a>
@@ -57,10 +57,10 @@
   </div>
 
   <!-- INFO CARDS -->
-  <div style="display:grid;grid-template-columns:280px 1fr;gap:1.75rem;align-items:start;">
+  <div class="profile-layout">
 
     <!-- Sidebar info -->
-    <div style="display:flex;flex-direction:column;gap:1rem;">
+    <div class="profile-sidebar" style="display:flex;flex-direction:column;gap:1rem;">
       <div class="card">
         <p style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:0.85rem;">Informações</p>
         <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.875rem;">
@@ -92,7 +92,7 @@
     </div>
 
     <!-- Produtos (se for produtor, vendedor ou loja) -->
-    <div>
+    <div class="profile-content">
       {% if user.role in ['produtor', 'vendedor', 'loja'] %}
         <div class="section-header" style="margin-bottom:1.25rem;">
           <h2>Produtos de {{ user.name }}</h2>

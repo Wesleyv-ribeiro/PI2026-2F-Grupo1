@@ -1134,7 +1134,7 @@ a.admin-stat:hover { border-color: var(--field); }
   .btn { min-width: 0; }
   .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-  .home-cols, .dash-grid { grid-template-columns: 1fr; }
+  .home-cols, .dash-grid, .profile-layout { grid-template-columns: 1fr; }
   .dash-grid aside { position: static !important; }
   .admin-stats { grid-template-columns: 1fr 1fr; }
   .form-row { grid-template-columns: 1fr; }
@@ -1166,7 +1166,13 @@ a.admin-stat:hover { border-color: var(--field); }
   .auth-box { padding: 2rem 1.25rem; }
   .section-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
   .profile-hero { padding: 1.75rem 1.25rem; }
-  .profile-hero-inner { flex-direction: column; gap: 1rem; }
+  .profile-hero-inner { flex-direction: column; gap: 1rem; align-items: flex-start; }
+  .profile-hero-actions { width: 100%; }
+  .profile-hero-actions .btn { flex: 1 1 160px; }
+  .profile-sidebar, .profile-content { width: 100%; }
+  .dashboard-profile-card { padding: 1.4rem 1rem !important; }
+  .dashboard-actions { width: 100%; }
+  .dashboard-info-list { gap: 0.7rem; }
   .relato-card { grid-template-columns: 1fr; }
   .relato-img { min-height: 200px; }
   .sidebar-sticky { position: static !important; }
@@ -1229,6 +1235,11 @@ a.admin-stat:hover { border-color: var(--field); }
   .container { width: calc(100% - 0.75rem); }
   .page-body { padding-top: 1rem; }
   .admin-stats { grid-template-columns: 1fr; }
+  .dashboard-actions { gap: 0.5rem !important; }
+  .dashboard-actions .btn,
+  .profile-hero-actions .btn { width: 100%; }
+  .profile-hero-actions { flex-direction: column; }
+  .profile-hero-actions .btn { min-width: 0; }
   .card-grid { grid-template-columns: 1fr; gap: 0.75rem; }
   .footer-grid { grid-template-columns: 1fr; }
   .auth-box { padding: 1.5rem 1rem; }
