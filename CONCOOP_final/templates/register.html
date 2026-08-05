@@ -66,6 +66,26 @@
     </p>
   </div>
 </div>
+<div class="modal-overlay" id="terms-modal-overlay">
+  <div class="modal terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title">
+    <div class="modal-header">
+      <h3 id="terms-modal-title">Termos de Uso e Política de Privacidade</h3>
+      <span class="termos-condicoes">
+        "Ao marcar a opção "Criar conta", você declara que concorda com os termos de uso e política de privacidade "
+        <a href="/CONCOOP_final/templates/termosdeusos.html" target="_blank">TERMO DE USO E POLÍTICA DE PRIVACIDADE</a>
+      </span>
+    </div>
+    <label class="terms-accept-row">
+      <input type="checkbox" id="terms-checkbox">
+      Li e aceito os Termos de Uso e a Política de Privacidade.
+    </label>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" id="terms-accept-btn" disabled>Aceitar e continuar</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -74,6 +94,46 @@
   const crmvField = document.getElementById('crmv-field');
   role.addEventListener('change', () => {
     crmvField.style.display = role.value === 'veterinario' ? 'flex' : 'none';
+  });
+  const registerForm = document.querySelector('form.form-grid');
+  const termsOverlay = document.getElementById('terms-modal-overlay');
+  const termsAcceptBtn = document.getElementById('terms-accept-btn');
+  const termsCancelBtn = document.getElementById('terms-cancel-btn');
+  const termsCloseBtn = document.getElementById('terms-modal-close');
+  const termsCheckbox = document.getElementById('terms-checkbox');
+  const termsAcceptedInput = document.getElementById('terms-accepted-input');
+  let termsAccepted = false;
+
+  function openTermsModal() {
+    termsOverlay.classList.add('open');
+  }
+  function closeTermsModal() {
+    termsOverlay.classList.remove('open');
+  }
+
+  registerForm.addEventListener('submit', function (e) {
+    if (!termsAccepted) {
+      e.preventDefault();
+      openTermsModal();
+    }
+  });
+
+  termsCloseBtn.addEventListener('click', closeTermsModal);
+  termsCancelBtn.addEventListener('click', closeTermsModal);
+  termsOverlay.addEventListener('click', function (e) {
+    if (e.target === termsOverlay) closeTermsModal();
+  });
+
+  termsCheckbox.addEventListener('change', function () {
+    termsAcceptBtn.disabled = !termsCheckbox.checked;
+  });
+
+  termsAcceptBtn.addEventListener('click', function () {
+    if (!termsCheckbox.checked) return;
+    termsAccepted = true;
+    termsAcceptedInput.value = '1';
+    closeTermsModal();
+    registerForm.submit();
   });
 </script>
 {% endblock %}
