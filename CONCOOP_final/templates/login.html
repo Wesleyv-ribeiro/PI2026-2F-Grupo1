@@ -29,32 +29,4 @@
     </p>
   </div>
 </div>
-<form id="meuFormulario" onsubmit="validarTermos(event)">
-    <div style="margin-bottom: 15px;">
-        <label for="nome">Nome:</label><br>
-        <input type="text" id="nome" required>
-    </div>
-
-    <div style="margin-bottom: 15px;">
-        <input type="checkbox" id="aceiteTermos" required>
-        <label for="aceiteTermos">
-            Li e concordo com os <a href="/termos" target="_blank">Termos de Condições de Uso</a> e Política de Privacidade.
-        </label>
-    </div>
-
-    <button type="submit">Cadastrar</button>
-</form>
-
-<script>
-    function validarTermos(event) {
-        const checkbox = document.getElementById('aceiteTermos');
-
-        if (!checkbox.checked) {
-            alert('Você precisa aceitar os Termos de Condições de Uso para continuar.');
-            event.preventDefault(); 
-        } else {
-            alert('Cadastro realizado com sucesso!');
-        }
-    }
-</script>
 {% endblock %}
