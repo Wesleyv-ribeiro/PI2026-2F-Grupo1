@@ -57,6 +57,25 @@
         <label for="profile_image">Foto de perfil (opcional)</label>
         <input type="file" id="profile_image" name="profile_image" accept="image/*">
       </div>
+      <div class="modal-overlay" id="terms-modal-overlay">
+        <div class="modal terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title">
+          <div class="modal-header">
+            <h4 id="terms-modal-title">Termos de Uso e Política de Privacidade</h4>
+            <span class="termos-condicoes">
+              Ao marcar a opção "Criar conta", você declara que concorda com os termos de uso e política de privacidade 
+              <a href="/CONCOOP_final/templates/termosdeusos.html" target="_blank">TERMO DE USO E POLÍTICA DE PRIVACIDADE</a>
+            </span>
+          </div>
+          <label class="terms-accept-row">
+            <input type="checkbox" id="terms-checkbox">
+            Li e aceito os Termos de Uso e a Política de Privacidade.
+          </label>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-primary" id="terms-accept-btn" disabled>Aceitar e continuar</button>
+          </div>
+        </div>
+      </div>
 
       <button type="submit" class="btn btn-primary btn-lg btn-full">Criar conta</button>
     </form>
@@ -64,25 +83,6 @@
     <p class="form-footer-link">
       Ja tem conta? <a href="{{ url_for('login') }}">Entrar</a>
     </p>
-  </div>
-</div>
-<div class="modal-overlay" id="terms-modal-overlay">
-  <div class="modal terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title">
-    <div class="modal-header">
-      <h3 id="terms-modal-title">Termos de Uso e Política de Privacidade</h3>
-      <span class="termos-condicoes">
-        "Ao marcar a opção "Criar conta", você declara que concorda com os termos de uso e política de privacidade "
-        <a href="/CONCOOP_final/templates/termosdeusos.html" target="_blank">TERMO DE USO E POLÍTICA DE PRIVACIDADE</a>
-      </span>
-    </div>
-    <label class="terms-accept-row">
-      <input type="checkbox" id="terms-checkbox">
-      Li e aceito os Termos de Uso e a Política de Privacidade.
-    </label>
-
-    <div class="modal-actions">
-      <button type="button" class="btn btn-primary" id="terms-accept-btn" disabled>Aceitar e continuar</button>
-    </div>
   </div>
 </div>
 

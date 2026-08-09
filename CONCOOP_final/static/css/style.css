@@ -1674,3 +1674,103 @@ a.admin-stat:hover { border-color: var(--field); }
 @media (max-width: 480px) {
   .modal { padding: 1.35rem; }
 }
+/* ═══════════════════════════════════════════
+   MODAL DE TERMOS DE USO (cadastro)
+═══════════════════════════════════════════ */
+.terms-modal { width: min(560px, 100%); }
+.terms-modal-body {
+  max-height: 45vh;
+  overflow-y: auto;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--ink);
+  padding-right: 0.5rem;
+  margin-bottom: 1rem;
+  border-top: 1px solid rgba(45,30,15,.08);
+  border-bottom: 1px solid rgba(45,30,15,.08);
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+.terms-modal-body p { margin-bottom: 0.75rem; }
+.terms-modal-body p:last-child { margin-bottom: 0; }
+.terms-accept-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+  margin-bottom: 0.25rem;
+}
+.terms-accept-row input { width: auto; margin-top: 0.2rem; }
+/* ═══════════════════════════════════════════
+   CSS DE TERMOS DE USO
+═══════════════════════════════════════════ */
+:root {
+  --soil:       #003701;
+  --bark:       #000000;
+  --hay:        #003701;
+  --hay-light:  #ffffff;
+  --field:      #034c00;
+  --field-dim:  #000000;
+  --cream:      #e7e8c3;
+  --white:      #ffffff;
+  --ink:        #000000;
+  --muted:      #527a72;
+  --border:     #0b470068;
+  --shadow-sm:  0 2px 8px rgba(45,30,15,.07);
+  --shadow-md:  0 8px 28px rgba(45,30,15,.10);
+  --shadow-lg:  0 20px 60px rgba(45,30,15,.13);
+  --r-lg: 20px;
+}
+
+* , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  background: var(--cream);
+  color: var(--ink);
+  line-height: 1.7;
+  min-height: 100vh;
+  background-image: radial-gradient(ellipse 80% 40% at 50% -10%, rgba(58,125,68,.09) 0%, transparent 60%);
+  padding: 3.5rem 1.5rem;
+}
+
+h4 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  font-size: clamp(1.4rem, 2.6vw, 2rem);
+  color: var(--soil);
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 2px solid var(--border);
+  letter-spacing: .01em;
+}
+
+p {
+  max-width: 760px;
+  margin: 0 auto;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  padding: clamp(1.5rem, 4vw, 3rem);
+  white-space: pre-line;
+  font-size: 0.98rem;
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--field);
+  color: var(--white);
+}
+
+@media (max-width: 600px) {
+  body { padding: 2rem 1rem; }
+  p { border-radius: var(--r-lg); padding: 1.25rem; font-size: 0.92rem; }
+}
