@@ -533,10 +533,13 @@ def create_app():
             city = request.form.get("city", "").strip()
             bio = request.form.get("bio", "").strip()
             crmv_input = request.form.get("crmv", "").strip()
+            terms_accepted = request.form.get("terms_accepted") == "1"
             profile_file = request.files.get("profile_image")
 
             error = None
-            if not name or not email or not password or not role:
+            if not terms_accepted:
+                error = "Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar a conta."
+            elif not name or not email or not password or not role:
                 error = "Preencha todos os campos obrigatórios."
             elif role not in ALLOWED_ROLES:
                 error = "Tipo de conta inválido."
@@ -636,6 +639,10 @@ def create_app():
                 flash(error, "error")
 
         return render_template("register.html")
+
+    @app.route("/termos")
+    def termos_uso():
+        return render_template("termos_usos.html")
 
     @app.route("/login", methods=["GET", "POST"])
     def login():

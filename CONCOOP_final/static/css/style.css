@@ -214,6 +214,13 @@ h1, h2, h3, h4 {
 }
 .btn:hover { transform: translateY(-1px); }
 .btn:active { transform: translateY(0); }
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  pointer-events: none;
+}
 
 .btn-primary { background: var(--field); color: #fff; border-color: var(--field); }
 .btn-primary:hover { background: var(--field-dim); border-color: var(--field-dim); }
