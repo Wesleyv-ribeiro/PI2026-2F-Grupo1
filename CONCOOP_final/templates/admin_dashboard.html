@@ -99,6 +99,11 @@
                         data-confirm="Rejeitar este produto? Ele não aparecerá no Mercado.">
                     <button type="submit" class="btn btn-sm btn-full btn-danger">Rejeitar</button>
                   </form>
+                  <form method="post" action="{{ url_for('delete_product', product_id=p.id) }}"
+                        data-confirm="Confirmar exclusão deste produto? Esta ação não pode ser desfeita.">
+                    <input type="hidden" name="next" value="{{ url_for('admin_dashboard') }}#produtos-pendentes">
+                    <button type="submit" class="btn btn-sm btn-full btn-danger">Excluir</button>
+                  </form>
                 </div>
               </td>
             </tr>
@@ -232,7 +237,7 @@
       <div class="table-wrap">
         <table class="table">
           <thead>
-            <tr><th>ID</th><th>Título</th><th>Produtor</th><th>Cidade</th><th>Preço</th><th>Verificação</th></tr>
+            <tr><th>ID</th><th>Título</th><th>Produtor</th><th>Cidade</th><th>Preço</th><th>Verificação</th><th>Ações</th></tr>
           </thead>
           <tbody>
             {% for p in products %}
@@ -250,6 +255,13 @@
                 {% else %}
                   <span class="badge badge-gold" title="{{ p.moderation_reason or '' }}">Em análise</span>
                 {% endif %}
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('delete_product', product_id=p.id) }}"
+                      data-confirm="Confirmar exclusão deste produto? Esta ação não pode ser desfeita.">
+                  <input type="hidden" name="next" value="{{ url_for('admin_dashboard') }}">
+                  <button type="submit" class="btn btn-danger btn-sm btn-full">Excluir</button>
+                </form>
               </td>
             </tr>
             {% endfor %}

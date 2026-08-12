@@ -121,6 +121,14 @@
                 <div class="card-actions">
                   <a href="{{ url_for('chat', user_id=user.id, product_id=p.id) }}" class="btn btn-primary btn-sm">Negociar</a>
                 </div>
+              {% elif g.user and g.user.id == user.id %}
+                <div class="card-actions">
+                  <form method="post" action="{{ url_for('delete_product', product_id=p.id) }}"
+                        data-confirm="Confirmar exclusão deste produto? Esta ação não pode ser desfeita.">
+                    <input type="hidden" name="next" value="{{ url_for('profile', user_id=user.id) }}">
+                    <button type="submit" class="btn btn-danger btn-sm btn-full">Excluir produto</button>
+                  </form>
+                </div>
               {% endif %}
             </article>
           {% else %}

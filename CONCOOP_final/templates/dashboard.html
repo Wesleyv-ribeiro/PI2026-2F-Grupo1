@@ -117,6 +117,11 @@
                 </div>
               </form>
               {% endif %}
+              <form method="post" action="{{ url_for('delete_product', product_id=p.id) }}"
+                    data-confirm="Confirmar exclusão deste produto? Esta ação não pode ser desfeita."
+                    style="margin-top:0.75rem;">
+                <button type="submit" class="btn btn-danger btn-sm btn-full">Excluir produto</button>
+              </form>
             </article>
           {% else %}
             <div class="empty">

@@ -262,6 +262,23 @@ def save_image(file_storage, subfolder: str) -> str | None:
     return rel_path
 
 
+def _delete_product_record(db, product_id: int) -> bool:
+    """Remove produto do banco e resolve denúncias associadas."""
+    product = db.execute(
+        "SELECT id FROM products WHERE id = ?",
+        (product_id,),
+    ).fetchone()
+    if product is None:
+        return False
+
+    db.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    db.execute(
+        "UPDATE reports SET is_resolved = 1 WHERE target_type = 'product' AND target_id = ?",
+        (product_id,),
+    )
+    return True
+
+
 def _normalize_text(text: str) -> str:
     """Normaliza espaços e traços para facilitar a extração do CRMV."""
     if not isinstance(text, str):
@@ -987,6 +1004,42 @@ def create_app():
             flash(f"Estoque atualizado: {new_stock} unidade(s) disponivel(is).", "success")
         return redirect(url_for("dashboard"))
 
+    @app.route("/products/<int:product_id>/delete", methods=["POST"])
+    def delete_product(product_id):
+        if g.user is None:
+            flash("Faça login para continuar.", "error")
+            return redirect(url_for("login"))
+
+        db = get_db()
+        product = db.execute(
+            "SELECT id, producer_id FROM products WHERE id = ?",
+            (product_id,),
+        ).fetchone()
+        if product is None:
+            flash("Produto não encontrado.", "error")
+            if g.user.get("is_admin"):
+                return redirect(url_for("admin_dashboard"))
+            return redirect(url_for("dashboard"))
+
+        is_owner = product["producer_id"] == g.user["id"]
+        is_admin = bool(g.user.get("is_admin"))
+        if not is_owner and not is_admin:
+            flash("Você não tem permissão para excluir este produto.", "error")
+            return redirect(url_for("dashboard"))
+
+        if not _delete_product_record(db, product_id):
+            flash("Produto não encontrado.", "error")
+        else:
+            db.commit()
+            flash("Produto excluído com sucesso.", "success")
+
+        next_url = request.form.get("next", "").strip()
+        if next_url.startswith("/"):
+            return redirect(next_url)
+        if is_admin and not is_owner:
+            return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("dashboard"))
+
     @app.route("/marketplace")
     def marketplace():
         db = get_db()
@@ -1126,13 +1179,11 @@ def create_app():
             return redirect(url_for("index"))
 
         db = get_db()
-        db.execute("DELETE FROM products WHERE id = ?", (product_id,))
-        db.execute(
-            "UPDATE reports SET is_resolved = 1 WHERE target_type = 'product' AND target_id = ?",
-            (product_id,),
-        )
-        db.commit()
-        flash("Produto excluído com sucesso.", "success")
+        if not _delete_product_record(db, product_id):
+            flash("Produto não encontrado.", "error")
+        else:
+            db.commit()
+            flash("Produto excluído com sucesso.", "success")
         return redirect(url_for("admin_reports"))
 
     @app.route("/admin/service/<int:service_id>/delete", methods=["POST"])
