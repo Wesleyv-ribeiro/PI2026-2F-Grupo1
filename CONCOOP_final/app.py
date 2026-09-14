@@ -21,7 +21,6 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-import moderation
 import email_utils
 
 try:
@@ -36,6 +35,8 @@ if load_dotenv is not None:
     # permite usar .env.example como fallback.
     load_dotenv(BASE_DIR / ".env", override=False)
     load_dotenv(BASE_DIR / ".env.example", override=False)
+
+import moderation
 
 # Fallback: aceita arquivo .env/.env.example contendo apenas a URL em uma linha.
 if not os.getenv("DATABASE_URL"):
@@ -1200,6 +1201,9 @@ def create_app():
         )
         db.commit()
         flash("Serviço excluído com sucesso.", "success")
+        next_url = request.form.get("next", "").strip()
+        if next_url.startswith("/"):
+            return redirect(next_url)
         return redirect(url_for("admin_reports"))
 
     @app.route("/admin/animal-report/<int:animal_report_id>/delete", methods=["POST"])
@@ -1216,6 +1220,9 @@ def create_app():
         )
         db.commit()
         flash("Relato excluído com sucesso.", "success")
+        next_url = request.form.get("next", "").strip()
+        if next_url.startswith("/"):
+            return redirect(next_url)
         return redirect(url_for("admin_reports"))
 
     @app.route("/admin/user/<int:user_id>/suspend", methods=["POST"])
@@ -1471,6 +1478,26 @@ def create_app():
             ORDER BY p.created_at ASC
             """
         ).fetchall()
+        services = db.execute(
+            """
+            SELECT s.id, s.title, s.description, s.category, s.price,
+                   s.location, s.created_at,
+                   u.name AS provider_name, u.id AS provider_id
+            FROM services s
+            JOIN users u ON s.provider_id = u.id
+            ORDER BY s.id DESC
+            """
+        ).fetchall()
+        animal_reports = db.execute(
+            """
+            SELECT r.id, r.title, r.description, r.species, r.urgency,
+                   r.location, r.status, r.created_at,
+                   u.name AS author_name, u.id AS author_id
+            FROM animal_reports r
+            JOIN users u ON r.user_id = u.id
+            ORDER BY r.id DESC
+            """
+        ).fetchall()
         messages = db.execute(
             """
             SELECT
@@ -1494,6 +1521,8 @@ def create_app():
             users=users,
             products=products,
             pending_products=pending_products,
+            services=services,
+            animal_reports=animal_reports,
             messages=messages,
             pending_reports=pending_reports,
         )

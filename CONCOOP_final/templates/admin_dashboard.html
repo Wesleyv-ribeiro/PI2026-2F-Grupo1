@@ -271,6 +271,86 @@
     </div>
   </section>
 
+  <!-- SERVIÇOS -->
+  <section class="section">
+    <div class="section-header"><h2>Serviços</h2></div>
+    <div class="card" style="padding:0;">
+      {% if services %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>ID</th><th>Título</th><th>Prestador</th><th>Categoria</th><th>Localização</th><th>Preço</th><th>Ações</th></tr>
+          </thead>
+          <tbody>
+            {% for s in services %}
+            <tr>
+              <td style="color:var(--muted);font-size:0.78rem;">{{ s.id }}</td>
+              <td>
+                <strong>{{ s.title }}</strong>
+                <div style="color:var(--muted);font-size:0.78rem;max-width:260px;">{{ s.description|truncate(90) }}</div>
+              </td>
+              <td><a href="{{ url_for('profile', user_id=s.provider_id) }}">{{ s.provider_name }}</a></td>
+              <td>{{ s.category or "—" }}</td>
+              <td>{{ s.location or "—" }}</td>
+              <td>{{ s.price or "—" }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin_delete_service', service_id=s.id) }}"
+                      data-confirm="Confirmar exclusão deste serviço? Esta ação não pode ser desfeita.">
+                  <input type="hidden" name="next" value="{{ url_for('admin_dashboard') }}">
+                  <button type="submit" class="btn btn-danger btn-sm btn-full">Excluir</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty" style="padding:1.5rem;"><p>Nenhum serviço publicado.</p></div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- RELATOS ANIMAIS -->
+  <section class="section">
+    <div class="section-header"><h2>Relatos de Ajuda Animal</h2></div>
+    <div class="card" style="padding:0;">
+      {% if animal_reports %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>ID</th><th>Relato</th><th>Autor</th><th>Espécie</th><th>Urgência</th><th>Status</th><th>Ações</th></tr>
+          </thead>
+          <tbody>
+            {% for r in animal_reports %}
+            <tr>
+              <td style="color:var(--muted);font-size:0.78rem;">{{ r.id }}</td>
+              <td>
+                <strong>{{ r.title }}</strong>
+                <div style="color:var(--muted);font-size:0.78rem;max-width:260px;">{{ r.description|truncate(90) }}</div>
+              </td>
+              <td><a href="{{ url_for('profile', user_id=r.author_id) }}">{{ r.author_name }}</a></td>
+              <td>{{ r.species or "—" }}</td>
+              <td>{{ r.urgency }}</td>
+              <td>{{ r.status }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin_delete_animal_report', animal_report_id=r.id) }}"
+                      data-confirm="Confirmar exclusão deste relato? Esta ação não pode ser desfeita.">
+                  <input type="hidden" name="next" value="{{ url_for('admin_dashboard') }}">
+                  <button type="submit" class="btn btn-danger btn-sm btn-full">Excluir</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty" style="padding:1.5rem;"><p>Nenhum relato publicado.</p></div>
+      {% endif %}
+    </div>
+  </section>
+
   <!-- MENSAGENS -->
   <section class="section">
     <div class="section-header"><h2>Mensagens</h2></div>

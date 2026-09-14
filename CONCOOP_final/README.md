@@ -46,6 +46,10 @@ Projeto exemplo de uma rede social/profissional simples focada em produtores rur
 
    ```env
    DATABASE_URL=postgresql://SEU_USUARIO:SUA_SENHA@127.0.0.1:5432/agrolink
+   GEMINI_API_KEY=sua_chave_do_gemini
+   # Alternativa aceita pela SDK: GOOGLE_API_KEY=sua_chave_do_gemini
+   # Opcional; o padrão é gemini-2.0-flash
+   GEMINI_MODEL=gemini-2.0-flash
    ```
 
 4. Execute a aplicação:

@@ -40,6 +40,18 @@ logger = logging.getLogger(__name__)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
+
+def _get_api_key() -> str:
+    return (
+        os.getenv("GEMINI_API_KEY", "").strip()
+        or os.getenv("GOOGLE_API_KEY", "").strip()
+        or GEMINI_API_KEY
+    )
+
+
+def _get_model() -> str:
+    return os.getenv("GEMINI_MODEL", "").strip() or GEMINI_MODEL
+
 # Status possíveis armazenados na coluna products.moderation_status
 STATUS_APPROVED = "aprovado"
 STATUS_REJECTED = "rejeitado"
@@ -137,8 +149,11 @@ def check_product_content(
     description = (description or "").strip()
     price = (price or "").strip()
 
-    if not GEMINI_API_KEY:
-        logger.warning("GEMINI_API_KEY não configurada.")
+    api_key = _get_api_key()
+    model = _get_model()
+
+    if not api_key:
+        logger.warning("GEMINI_API_KEY/GOOGLE_API_KEY não configurada.")
         return _fallback_pending(
             "Verificação automática indisponível (chave da API não configurada)."
         )
@@ -159,11 +174,11 @@ def check_product_content(
 
     try:
         # Inicializa o cliente com a nova SDK
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        client = genai.Client(api_key=api_key)
 
         # Chama o modelo gemini-2.0-flash
         response = client.models.generate_content(
-            model=GEMINI_MODEL,
+            model=model,
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=_SYSTEM_INSTRUCTION,
