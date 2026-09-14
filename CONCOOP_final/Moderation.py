@@ -33,12 +33,63 @@ import logging
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
 def _clean_env(value: Optional[str]) -> str:
     return (value or "").strip().strip('"').strip("'")
+
+
+def _parse_env_file(env_path: Path) -> dict[str, str]:
+    try:
+        raw = env_path.read_bytes()
+        text = raw.decode("utf-8-sig")
+        if "\x00" in text[:80]:
+            text = raw.decode("utf-16")
+    except OSError:
+        return {}
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key = key.strip()
+        val = _clean_env(val)
+        if key and val:
+            values[key] = val
+    return values
+
+
+def _load_local_env() -> None:
+    """Lê o .env local e preenche só variáveis ainda vazias.
+
+    Não grava chave vazia no ambiente, senão um GEMINI_API_KEY= no arquivo
+    impede a chave real de ser carregada depois.
+    """
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import dotenv_values
+
+        parsed = dotenv_values(env_path) or {}
+        values = {
+            str(key): _clean_env(val)
+            for key, val in parsed.items()
+            if key and _clean_env(val)
+        }
+    except ImportError:
+        values = _parse_env_file(env_path)
+    for key, val in values.items():
+        if not _clean_env(os.environ.get(key)):
+            os.environ[key] = val
+
+
+_load_local_env()
 
 
 # gemini-2.0-flash foi desligado em 01/06/2026. Chaves válidas ainda
@@ -62,6 +113,7 @@ _FALLBACK_MODELS = (
 
 
 def _get_api_key() -> str:
+    _load_local_env()
     return (
         _clean_env(os.getenv("GEMINI_API_KEY"))
         or _clean_env(os.getenv("GOOGLE_API_KEY"))

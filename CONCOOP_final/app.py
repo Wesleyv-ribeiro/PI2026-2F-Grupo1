@@ -499,7 +499,9 @@ def create_app():
                 u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
-            WHERE p.is_featured = 1 AND (p.stock > 0 OR p.made_to_order = 1)
+                        WHERE p.is_featured = 1
+                            AND (p.stock > 0 OR p.made_to_order = 1)
+                            AND p.moderation_status = 'aprovado'
             ORDER BY p.created_at DESC
             LIMIT 12
             """
@@ -520,7 +522,8 @@ def create_app():
                 u.name AS producer_name, u.city
             FROM products p
             JOIN users u ON p.producer_id = u.id
-            WHERE p.stock > 0 OR p.made_to_order = 1
+                        WHERE (p.stock > 0 OR p.made_to_order = 1)
+                            AND p.moderation_status = 'aprovado'
             ORDER BY p.created_at DESC
             LIMIT 20
             """
