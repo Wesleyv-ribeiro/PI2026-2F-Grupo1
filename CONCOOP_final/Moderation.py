@@ -37,20 +37,69 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+def _clean_env(value: Optional[str]) -> str:
+    return (value or "").strip().strip('"').strip("'")
+
+
+# gemini-2.0-flash foi desligado em 01/06/2026. Chaves válidas ainda
+# recebem 404 se o código continuar apontando para esse modelo.
+GEMINI_API_KEY = _clean_env(os.getenv("GEMINI_API_KEY"))
+GEMINI_MODEL = _clean_env(os.getenv("GEMINI_MODEL")) or "gemini-2.5-flash"
+
+_RETIRED_MODELS = {
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-001",
+    "gemini-2.0-flash-exp",
+    "gemini-2.0-flash-lite",
+    "gemini-2.0-flash-lite-001",
+}
+
+_FALLBACK_MODELS = (
+    "gemini-2.5-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+)
 
 
 def _get_api_key() -> str:
     return (
-        os.getenv("GEMINI_API_KEY", "").strip()
-        or os.getenv("GOOGLE_API_KEY", "").strip()
+        _clean_env(os.getenv("GEMINI_API_KEY"))
+        or _clean_env(os.getenv("GOOGLE_API_KEY"))
         or GEMINI_API_KEY
     )
 
 
 def _get_model() -> str:
-    return os.getenv("GEMINI_MODEL", "").strip() or GEMINI_MODEL
+    return _clean_env(os.getenv("GEMINI_MODEL")) or GEMINI_MODEL
+
+
+def _candidate_models() -> list[str]:
+    preferred = _get_model()
+    models: list[str] = []
+    if preferred and preferred not in _RETIRED_MODELS:
+        models.append(preferred)
+    elif preferred in _RETIRED_MODELS:
+        logger.warning(
+            "GEMINI_MODEL=%s foi descontinuado; usando modelos atuais.",
+            preferred,
+        )
+    for name in _FALLBACK_MODELS:
+        if name not in models:
+            models.append(name)
+    return models
+
+
+def _is_model_unavailable(exc: Exception) -> bool:
+    text = str(exc).lower()
+    markers = (
+        "404",
+        "not_found",
+        "not found",
+        "no longer available",
+        "is not found",
+        "not supported",
+    )
+    return any(marker in text for marker in markers)
 
 # Status possíveis armazenados na coluna products.moderation_status
 STATUS_APPROVED = "aprovado"
@@ -150,7 +199,7 @@ def check_product_content(
     price = (price or "").strip()
 
     api_key = _get_api_key()
-    model = _get_model()
+    models = _candidate_models()
 
     if not api_key:
         logger.warning("GEMINI_API_KEY/GOOGLE_API_KEY não configurada.")
@@ -172,23 +221,49 @@ def check_product_content(
     - PREÇO: {price or 'não informado'}
     """
 
+    raw_text = ""
+    last_error: Optional[Exception] = None
     try:
-        # Inicializa o cliente com a nova SDK
         client = genai.Client(api_key=api_key)
-
-        # Chama o modelo gemini-2.0-flash
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=_SYSTEM_INSTRUCTION,
-                response_mime_type="application/json",
-                temperature=0,
-            ),
+        config = types.GenerateContentConfig(
+            system_instruction=_SYSTEM_INSTRUCTION,
+            response_mime_type="application/json",
+            temperature=0,
         )
-        raw_text = (response.text or "").strip()
+        for model in models:
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=config,
+                )
+                raw_text = (response.text or "").strip()
+                if raw_text:
+                    logger.info("Moderação Gemini concluída com o modelo %s.", model)
+                    break
+                logger.warning("Modelo %s devolveu resposta vazia.", model)
+            except Exception as e:
+                last_error = e
+                if _is_model_unavailable(e):
+                    logger.warning(
+                        "Modelo Gemini %s indisponível (%s); tentando outro.",
+                        model,
+                        e,
+                    )
+                    continue
+                logger.exception("Falha ao consultar a API do Gemini: %s", e)
+                return _fallback_pending(
+                    "Não foi possível concluir a verificação automática no momento."
+                )
+        else:
+            logger.error(
+                "Nenhum modelo Gemini respondeu. Último erro: %s", last_error
+            )
+            return _fallback_pending(
+                "Não foi possível concluir a verificação automática no momento."
+            )
     except Exception as e:
-        logger.exception(f"Falha ao consultar a API do Gemini: {e}")
+        logger.exception("Falha ao consultar a API do Gemini: %s", e)
         return _fallback_pending(
             "Não foi possível concluir a verificação automática no momento."
         )
