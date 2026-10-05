@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Aplicativo Android — CONCOOP{% endblock %}
+
+{% block content %}
+<main class="container app-download-page">
+  <section class="app-download-hero" aria-labelledby="app-download-title">
+    <span class="app-download-kicker">CONCOOP PARA ANDROID</span>
+    <h1 id="app-download-title">A cooperativa no seu bolso.</h1>
+    <p>Consulte produtos e veterinários e prepare novos envios mesmo quando estiver sem internet. Eles serão sincronizados quando a conexão voltar.</p>
+
+    {% if apk_available %}
+      <a href="{{ url_for('download_android_app') }}" class="btn btn-hero-light btn-lg" download>
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3"/>
+        </svg>
+        Baixar para Android
+      </a>
+      <p class="app-download-meta">APK para Android 7.0 ou superior · {{ apk_size_mb }} MB</p>
+    {% else %}
+      <div class="app-download-status" role="status">
+        <strong>Download em preparação</strong>
+        <span>A versão Android estará disponível aqui assim que o pacote de distribuição for publicado.</span>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="app-download-details" aria-label="Informações do aplicativo">
+    <div>
+      <h2>O que você encontra no app</h2>
+      <ul>
+        <li>Produtos e veterinários verificados em cache para consulta offline.</li>
+        <li>Fila local para produtos, serviços, relatos de animais e mensagens.</li>
+        <li>Envio automático quando a conexão voltar e sua conta estiver autenticada.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Instalação</h2>
+      <p>Baixe o arquivo APK no Android e abra-o para instalar. Se o sistema solicitar, permita a instalação de aplicativos obtidos pelo navegador. Confira se está acessando o domínio oficial concoop.com.br.</p>
+      <p>É necessário Android 7.0 ou superior. Para sincronizar os dados, entre no app enquanto estiver conectado à internet.</p>
+    </div>
+  </section>
+</main>
+{% endblock %}

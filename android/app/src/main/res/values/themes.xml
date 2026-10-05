@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.CONCOOP" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#034C00</item>
+        <item name="android:navigationBarColor">#E7E8C3</item>
+        <item name="android:statusBarColor">#003701</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

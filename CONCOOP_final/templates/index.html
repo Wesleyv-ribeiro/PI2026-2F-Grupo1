@@ -57,6 +57,15 @@
     }
   ]) }}
 
+  <section class="app-promo" aria-labelledby="app-promo-title">
+    <div>
+      <span class="app-promo-kicker">CONCOOP PARA ANDROID</span>
+      <h2 id="app-promo-title">Leve a cooperativa com você.</h2>
+      <p>Acesse produtos e veterinários e prepare envios mesmo sem conexão.</p>
+    </div>
+    <a href="{{ url_for('download_app') }}" class="btn btn-primary">Conhecer o aplicativo</a>
+  </section>
+
   <div class="stat-grid mb-3">
     <div class="stat-card">
       <div class="stat-number">{{ products|length }}</div>

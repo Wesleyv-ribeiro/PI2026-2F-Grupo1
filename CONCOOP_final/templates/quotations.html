@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Cotações — CONCOOP{% endblock %}
+
+{% block content %}
+<main class="container page-body quotation-page">
+  <header class="page-header">
+    <h1>Cotações do mercado</h1>
+    <p class="quotation-intro">Referências de preços agropecuários publicadas pelo CEPEA/ESALQ. Os valores dos anúncios no Mercado são definidos pelos próprios vendedores.</p>
+  </header>
+
+  <form method="get" action="{{ url_for('quotations') }}" class="quotation-controls">
+    <div class="form-field">
+      <label for="quotation-product">Produto e região</label>
+      <select id="quotation-product" name="produto">
+        {% for key, indicator in indicators.items() %}
+          <option value="{{ key }}" {% if key == selected_key %}selected{% endif %}>{{ indicator.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Consultar cotação</button>
+  </form>
+
+  <section aria-labelledby="quotation-current-title">
+    <h2 id="quotation-current-title" class="quotation-title">{{ selected.label }}</h2>
+    <p class="quotation-detail">Unidade de referência: {{ selected.unit }}. A data e o valor são atualizados pela fonte oficial.</p>
+    <div class="quotation-widget" aria-label="Cotação atual fornecida pelo CEPEA/ESALQ">
+      <p id="quotation-unavailable" class="quotation-fallback" hidden>
+        Não foi possível carregar a cotação agora. Consulte a
+        <a href="{{ selected.source_url }}" target="_blank" rel="noopener noreferrer">página do indicador no CEPEA</a>.
+      </p>
+      <script src="{{ widget_url }}" onerror="document.getElementById('quotation-unavailable').hidden = false"></script>
+    </div>
+    <p class="quotation-attribution">
+      Fonte: <a href="{{ selected.source_url }}" target="_blank" rel="noopener noreferrer">CEPEA/ESALQ</a>.
+      Dados exibidos pelo widget oficial; licença
+      <a href="https://www.cepea.org.br/br/licenca-de-uso-de-dados.aspx" target="_blank" rel="noopener noreferrer">CC BY-NC 4.0</a>.
+      Cotações são referências de mercado e não garantem preço de negociação.
+    </p>
+  </section>
+</main>
+{% endblock %}

@@ -3,16 +3,19 @@ from datetime import datetime, timedelta
 import re
 import secrets
 from pathlib import Path
+from urllib.parse import urlencode
 
 import psycopg2
 from psycopg2.extras import DictCursor
 from psycopg2 import OperationalError
 from flask import (
     Flask,
+    abort,
     g,
     redirect,
     render_template,
     request,
+    send_from_directory,
     session,
     url_for,
     flash,
@@ -30,6 +33,8 @@ except ImportError:  # opcional em runtime
 
 
 BASE_DIR = Path(__file__).resolve().parent
+ANDROID_APP_DIR = BASE_DIR / "static" / "downloads"
+ANDROID_APP_FILENAME = "concoop-android.apk"
 if load_dotenv is not None:
     # Carrega .env (preferencial) e, em ambiente acadêmico/local,
     # permite usar .env.example como fallback.
@@ -87,6 +92,67 @@ ROLE_LABELS = {
     "loja": "Loja",
 }
 
+CEPEA_INDICATORS = {
+    "arroz-rs": {
+        "label": "Arroz em casca — Rio Grande do Sul",
+        "indicator_id": "91",
+        "unit": "R$/saca de 50 kg",
+        "source_url": "https://www.cepea.org.br/br/indicador/arroz.aspx",
+    },
+    "milho": {
+        "label": "Milho — Indicador ESALQ/BM&FBOVESPA",
+        "indicator_id": "77",
+        "unit": "R$/saca de 60 kg",
+        "source_url": "https://www.cepea.org.br/br/indicador/milho.aspx",
+    },
+    "soja-pr": {
+        "label": "Soja — Paraná",
+        "indicator_id": "12",
+        "unit": "R$/saca de 60 kg",
+        "source_url": "https://www.cepea.org.br/br/indicador/soja.aspx",
+    },
+    "soja-paranagua": {
+        "label": "Soja — Paranaguá",
+        "indicator_id": "92",
+        "unit": "R$/saca de 60 kg",
+        "source_url": "https://www.cepea.org.br/br/indicador/soja.aspx",
+    },
+    "trigo-pr": {
+        "label": "Trigo — Paraná",
+        "indicator_id": "178",
+        "unit": "R$/tonelada",
+        "source_url": "https://www.cepea.org.br/br/indicador/trigo.aspx",
+    },
+    "trigo-rs": {
+        "label": "Trigo — Rio Grande do Sul",
+        "indicator_id": "179",
+        "unit": "R$/tonelada",
+        "source_url": "https://www.cepea.org.br/br/indicador/trigo.aspx",
+    },
+    "feijao-carioca-sp": {
+        "label": "Feijão-carioca — São Paulo",
+        "indicator_id": "380-1",
+        "unit": "R$/saca de 60 kg",
+        "source_url": "https://www.cepea.org.br/br/indicador/feijao.aspx",
+    },
+}
+
+
+def _cepea_widget_url(indicator_id: str) -> str:
+    """Gera a URL do widget oficial do CEPEA para um indicador permitido."""
+    params = urlencode(
+        [
+            ("id_indicador[]", indicator_id),
+            ("fonte", "arial"),
+            ("tamanho", "12"),
+            ("largura", "100%"),
+            ("corfundo", "003701"),
+            ("cortexto", "000000"),
+            ("corlinha", "e7e8c3"),
+        ]
+    )
+    return f"https://www.cepea.org.br/br/widgetproduto.js.php?{params}"
+
 
 def normalize_role(role: str | None) -> str | None:
     if role is None:
@@ -131,21 +197,34 @@ def _ascii_safe_text(value: str | None) -> str | None:
     return text.encode("ascii", errors="ignore").decode("ascii")
 
 
+def _clear_non_ascii_windows_env():
+    r"""Remove variáveis de ambiente com bytes não-ASCII antes do psycopg2 conectar.
+
+    Em Windows, caminhos como C:\Users\Usuário podem quebrar a libpq ao tentar
+    decodificar o ambiente em UTF-8 antes mesmo do handshake com o PostgreSQL.
+    """
+    snapshot = {}
+    for key, value in list(os.environ.items()):
+        if not isinstance(value, str):
+            continue
+        try:
+            value.encode("ascii")
+        except UnicodeEncodeError:
+            snapshot[key] = value
+            os.environ.pop(key, None)
+    return snapshot
+
+
 def connect_db():
     # O psycopg2 no Windows le TODAS as variaveis de ambiente do sistema,
     # incluindo caminhos como C:\Users\Usuário que contem bytes nao-ASCII.
-    # Solucao: parsear a URL manualmente, limpar as variaveis PG* do ambiente
+    # Solucao: parsear a URL manualmente, limpar as variaveis de ambiente problemáticas
     # antes da conexao e conectar por parametros nomeados, sem passar a DSN.
     from urllib.parse import urlparse, unquote
     parsed = urlparse(DEFAULT_DATABASE_URL)
 
     def _do_connect():
-        pg_env_snapshot = {}
-        for key in list(os.environ):
-            if key.startswith("PG"):
-                pg_env_snapshot[key] = os.environ[key]
-                os.environ.pop(key, None)
-
+        env_snapshot = _clear_non_ascii_windows_env()
         try:
             return psycopg2.connect(
                 host=_ascii_safe_text(parsed.hostname or "127.0.0.1"),
@@ -155,7 +234,7 @@ def connect_db():
                 password=_ascii_safe_text(unquote(parsed.password or "postgres")),
             )
         finally:
-            for key, value in pg_env_snapshot.items():
+            for key, value in env_snapshot.items():
                 os.environ[key] = value
 
     try:
@@ -543,6 +622,216 @@ def create_app():
             featured_products=featured_products,
             vets=vets,
         )
+
+    @app.route("/app")
+    def download_app():
+        apk_path = ANDROID_APP_DIR / ANDROID_APP_FILENAME
+        apk_available = apk_path.is_file()
+        apk_size_mb = round(apk_path.stat().st_size / (1024 * 1024), 1) if apk_available else None
+        return render_template(
+            "download_app.html",
+            apk_available=apk_available,
+            apk_size_mb=apk_size_mb,
+        )
+
+    @app.route("/app/download")
+    def download_android_app():
+        if not (ANDROID_APP_DIR / ANDROID_APP_FILENAME).is_file():
+            abort(404)
+        return send_from_directory(
+            ANDROID_APP_DIR,
+            ANDROID_APP_FILENAME,
+            as_attachment=True,
+            download_name="CONCOOP-Android.apk",
+            mimetype="application/vnd.android.package-archive",
+            max_age=0,
+        )
+
+    @app.route("/api/mobile/home")
+    def api_mobile_home():
+        from flask import jsonify
+
+        db = get_db()
+        products = db.execute(
+            """
+            SELECT p.id, p.title, p.description, p.price, p.stock,
+                   p.made_to_order, p.image_path,
+                   u.name AS producer_name, u.city
+            FROM products p
+            JOIN users u ON p.producer_id = u.id
+            WHERE (p.stock > 0 OR p.made_to_order = 1)
+              AND p.moderation_status = 'aprovado'
+            ORDER BY p.created_at DESC
+            LIMIT 12
+            """
+        ).fetchall()
+        vets = db.execute(
+            """
+            SELECT id, name, city, bio
+            FROM users
+            WHERE role = 'veterinario' AND is_vet_verified = 1
+            ORDER BY id DESC
+            LIMIT 6
+            """
+        ).fetchall()
+
+        return jsonify({
+            "products": [dict(product) for product in products],
+            "vets": [dict(vet) for vet in vets],
+        })
+
+    @app.route("/api/mobile/session")
+    def api_mobile_session():
+        from flask import jsonify
+
+        if g.user is None:
+            return jsonify({"error": "not_logged_in"}), 401
+        return jsonify({
+            "id": g.user["id"],
+            "name": g.user["name"],
+            "role": g.user["role"],
+        })
+
+    @app.route("/api/mobile/sync", methods=["POST"])
+    def api_mobile_sync():
+        from flask import jsonify
+
+        if g.user is None:
+            return jsonify({"error": "not_logged_in"}), 401
+
+        client_id = request.form.get("client_id", "").strip()
+        submission_type = request.form.get("type", "").strip()
+        if not client_id or len(client_id) > 80:
+            return jsonify({"error": "invalid_client_id"}), 400
+
+        db = get_db()
+        receipt = db.execute(
+            """
+            SELECT client_id FROM mobile_sync_receipts
+            WHERE user_id = ? AND client_id = ?
+            """,
+            (g.user["id"], client_id),
+        ).fetchone()
+        if receipt is not None:
+            return jsonify({"status": "synced", "duplicate": True, "client_id": client_id})
+
+        title = request.form.get("title", "").strip()
+        description = request.form.get("description", "").strip()
+        entity_id = None
+
+        if submission_type == "product":
+            if not can_create_product(g.user["role"]):
+                return jsonify({"error": "profile_cannot_create_products"}), 403
+            price = request.form.get("price", "").strip()
+            stock_value = request.form.get("stock", "").strip()
+            made_to_order = 1 if request.form.get("made_to_order") == "1" else 0
+            if not title or not description:
+                return jsonify({"error": "title_and_description_required"}), 400
+            if not made_to_order and not stock_value.isdigit():
+                return jsonify({"error": "invalid_stock"}), 400
+
+            product_file = request.files.get("product_image")
+            image_path = None
+            if product_file and product_file.filename:
+                image_path = save_image(product_file, "products")
+                if image_path is None:
+                    return jsonify({"error": "invalid_product_image"}), 400
+
+            stock = 0 if made_to_order else int(stock_value)
+            check = moderation.check_product_content(
+                title=title,
+                description=description,
+                price=price,
+            )
+            db.execute(
+                """
+                INSERT INTO products (
+                    producer_id, title, description, price, stock, made_to_order,
+                    created_at, image_path, moderation_status, moderation_reason,
+                    moderation_checked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    g.user["id"], title, description, price or None, stock,
+                    made_to_order, datetime.utcnow(), image_path, check.status,
+                    check.reason, datetime.utcnow(),
+                ),
+            )
+
+        elif submission_type == "service":
+            if not title or not description:
+                return jsonify({"error": "title_and_description_required"}), 400
+            db.execute(
+                """
+                INSERT INTO services
+                    (provider_id, title, description, category, price, location, contact, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    g.user["id"], title, description,
+                    request.form.get("category", "").strip() or None,
+                    request.form.get("price", "").strip() or None,
+                    request.form.get("location", "").strip() or None,
+                    request.form.get("contact", "").strip() or None,
+                    datetime.utcnow(),
+                ),
+            )
+
+        elif submission_type == "animal_report":
+            species = request.form.get("species", "").strip()
+            if not title or not description or not species:
+                return jsonify({"error": "title_description_and_species_required"}), 400
+            db.execute(
+                """
+                INSERT INTO animal_reports
+                    (user_id, title, description, species, urgency, location, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    g.user["id"], title, description, species,
+                    request.form.get("urgency", "media").strip() or "media",
+                    request.form.get("location", "").strip() or None,
+                    datetime.utcnow(),
+                ),
+            )
+
+        elif submission_type == "message":
+            content = request.form.get("content", "").strip()
+            try:
+                receiver_id = int(request.form.get("receiver_id", ""))
+            except ValueError:
+                return jsonify({"error": "invalid_vet"}), 400
+            if not content:
+                return jsonify({"error": "message_required"}), 400
+            vet = db.execute(
+                """
+                SELECT id FROM users
+                WHERE id = ? AND role = 'veterinario' AND is_vet_verified = 1
+                """,
+                (receiver_id,),
+            ).fetchone()
+            if vet is None:
+                return jsonify({"error": "vet_not_found"}), 404
+            db.execute(
+                """
+                INSERT INTO messages (sender_id, receiver_id, content, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (g.user["id"], receiver_id, content, datetime.utcnow()),
+            )
+
+        else:
+            return jsonify({"error": "unsupported_submission_type"}), 400
+
+        db.execute(
+            """
+            INSERT INTO mobile_sync_receipts (user_id, client_id, submission_type, entity_id, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (g.user["id"], client_id, submission_type, entity_id, datetime.utcnow()),
+        )
+        db.commit()
+        return jsonify({"status": "synced", "duplicate": False, "client_id": client_id}), 201
 
     @app.route("/register", methods=["GET", "POST"])
     def register():
@@ -1076,6 +1365,20 @@ def create_app():
             key=str.casefold,
         )
         return render_template("marketplace.html", products=products, cities=cities)
+
+    @app.route("/cotacoes")
+    def quotations():
+        selected_key = request.args.get("produto", "milho")
+        if selected_key not in CEPEA_INDICATORS:
+            selected_key = "milho"
+        selected = CEPEA_INDICATORS[selected_key]
+        return render_template(
+            "quotations.html",
+            indicators=CEPEA_INDICATORS,
+            selected_key=selected_key,
+            selected=selected,
+            widget_url=_cepea_widget_url(selected["indicator_id"]),
+        )
 
     @app.route("/report", methods=["POST"])
     def report_content():
@@ -1928,6 +2231,19 @@ def init_db():
             content TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL,
             is_read INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mobile_sync_receipts (
+            user_id INTEGER NOT NULL REFERENCES users (id),
+            client_id TEXT NOT NULL,
+            submission_type TEXT NOT NULL,
+            entity_id INTEGER,
+            created_at TIMESTAMP NOT NULL,
+            PRIMARY KEY (user_id, client_id)
         )
         """
     )
